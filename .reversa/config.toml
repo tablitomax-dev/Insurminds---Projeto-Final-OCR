@@ -1,0 +1,50 @@
+# Reversa — Configuração do Projeto
+# Este arquivo é gerenciado pelo instalador. Para customizações, edite config.user.toml
+
+[project]
+name = "Insurminds - Desafio Final"
+version = "1.0.0"
+
+[user]
+name = "pbena"
+chat_language = "pt-br"
+doc_language = "Português"
+
+[output]
+folder = "_reversa_sdd"
+
+[agents]
+installed = [
+  "reversa",
+  "reversa-scout",
+  "reversa-archaeologist",
+  "reversa-detective",
+  "reversa-architect",
+  "reversa-writer",
+  "reversa-reviewer",
+  "reversa-visor",
+  "reversa-data-master",
+  "reversa-design-system",
+  "reversa-agents-help",
+  "reversa-reconstructor"
+]
+
+[engines]
+installed = [
+  "claude-code"
+]
+
+[analysis]
+answer_mode = "chat"
+doc_level = "completo"
+
+# Organização das specs geradas pelos agentes.
+# Esta seção é preenchida pelo Reversa após o Scout sugerir uma estrutura
+# e o usuário confirmar a escolha no menu (logo após a pergunta de doc_level).
+# Para reapresentar o menu, remova a seção [specs] inteira e rode o Reversa de novo.
+[specs]
+layout = ""              # constante "feature-folder" após a primeira execução
+granularity = ""         # module | use-case | endpoint | hybrid | feature | custom
+custom_folders = []      # preenchido apenas quando granularity == "custom"
+scout_suggestion = ""    # registro da sugestão original do Scout, imutável após a 1a execução
+decided_at = ""          # timestamp ISO 8601 da escolha do usuário
