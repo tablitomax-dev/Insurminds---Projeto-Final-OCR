@@ -8,6 +8,17 @@
   "doc_level": "completo",
   "output_folder": "_reversa_sdd",
   "forward_folder": "_reversa_forward",
+  "newproject_progress": {
+    "mode": "guiado",
+    "stage": "spec-sdd",
+    "started_at": "2026-09-25T00:00:00-03:00",
+    "last_checkpoint_at": "2026-09-25T02:45:00-03:00",
+    "completed_stages": ["ideator", "researcher", "drafter"],
+    "spec_sdd_components": ["shared-kernel-contracts (100/100)"],
+    "spec_sdd_deferred": ["document_processing", "policy_analysis", "evaluation"],
+    "contracts_implemented": ["src/shared_kernel (4 módulos)", "tests/contracts (67 testes)", "pyproject.toml", "requirements.txt"],
+    "brief": "Plataforma inteligente (monólito modular em Python) para ingestão, análise e comparação de apólices de seguro D&O, transformando PDFs em evidências recuperáveis e depois em fatos estruturados, comparações determinísticas e explicações rastreáveis."
+  },
   "phase": null,
   "completed": [],
   "pending": [
@@ -33,7 +44,18 @@
     "reversa-data-master",
     "reversa-design-system",
     "reversa-agents-help",
-    "reversa-reconstructor"
+    "reversa-reconstructor",
+    "reversa-new",
+    "reversa-forward",
+    "reversa-ideator",
+    "reversa-researcher",
+    "reversa-drafter",
+    "reversa-spec-sdd",
+    "reversa-requirements",
+    "reversa-clarify",
+    "reversa-plan",
+    "reversa-to-do",
+    "reversa-coding"
   ],
   "created_files": [
     ".claude\\skills\\reversa",

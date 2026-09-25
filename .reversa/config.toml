@@ -26,7 +26,18 @@ installed = [
   "reversa-data-master",
   "reversa-design-system",
   "reversa-agents-help",
-  "reversa-reconstructor"
+  "reversa-reconstructor",
+  "reversa-new",
+  "reversa-forward",
+  "reversa-ideator",
+  "reversa-researcher",
+  "reversa-drafter",
+  "reversa-spec-sdd",
+  "reversa-requirements",
+  "reversa-clarify",
+  "reversa-plan",
+  "reversa-to-do",
+  "reversa-coding"
 ]
 
 [engines]

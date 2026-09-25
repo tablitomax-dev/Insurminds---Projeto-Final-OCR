@@ -1,65 +1,53 @@
-# Plano de Exploração — Insurminds - Desafio Final
+# Plano do Projeto — Insurminds - Desafio Final
 
-> Criado pelo Reversa em 2026-09-25
+> Ajustado pelo Reversa em 2026-09-25: projeto **greenfield** (sem código legado),
+> guiado por `resumo_executivo_arquitetura_monolito_modular (1).md`.
+> Fluxo: `/reversa-new` (ideia → PRD → specs SDD) → `/reversa-forward` (specs → código).
 > Marque cada tarefa com ✅ quando concluída.
-> Você pode editar este plano antes de iniciar: adicione, remova ou reordene tarefas conforme necessário.
 
 ---
 
-## Fase 1: Reconhecimento 🔍
+## Papéis e ownership
 
-- [ ] **Scout** — Mapeamento de estrutura de pastas e tecnologias
-- [ ] **Scout** — Análise de dependências e gerenciadores de pacotes
-- [ ] **Scout** — Identificação de entry points, CI/CD e configurações
+- **Desenvolvedor 1 (pbena):** `src/modules/document_processing/**`, pipeline documental + RAG (PyMuPDF, PaddleOCR, PP-StructureV3, LlamaIndex, embeddings Gemini, Qdrant local Docker). Produce `EvidenceRef`.
+- **Desenvolvedor 2:** `src/modules/policy_analysis/**`, `src/modules/evaluation/**`, Streamlit, DuckDB (extração estruturada, validação, comparação, explicação). Consome `EvidenceRef`, produz `ExtractedFact`.
+- **Compartilhado (muda só com revisão dos dois):** `src/shared_kernel/contracts/**`, `src/composition_root/**`, `tests/contracts/**`, `docs/architecture/**`.
 
-## Decisão de organização das specs 🗂️
+## Zonas de integração — AVISAR ANTES DE TOCAR
 
-> Entre o Scout e o Arqueólogo, o Reversa pergunta como você quer organizar as specs (por módulo, caso de uso, endpoint, híbrida, por features ou customizada). A escolha fica persistida em `.reversa/config.toml` na seção `[specs]` e não será reperguntada em execuções futuras. Para reapresentar o menu, remova manualmente a seção.
+1. `shared_kernel/contracts` — `EvidenceRef`, IDs, `RetrievalQuery/Result`, `ExtractedFact`, `ProcessingStatus`, `ChunkMetadata`
+2. Metadados de chunks (contrato versionado)
+3. Evidências (produzidas pelo Dev 1, consumidas pelo Dev 2)
+4. Orquestração do workflow (camada de aplicação, fachadas públicas)
+5. `ModelGateway` + observabilidade (transversais)
 
-## Fase 2: Escavação 🏗️
+Regra: nenhum módulo importa o interno do outro; acesso só via `public_api.py`. Alteração de contrato exige PR revisada pelos dois desenvolvedores.
 
-> O Reversa preenche esta seção com os módulos reais após o Scout concluir o reconhecimento.
+## Pipeline /reversa-new
 
-- [ ] **Arqueólogo** — Análise dos módulos identificados pelo Scout
+- [x] **Ideator** — brainstorm estruturado a partir do resumo executivo → `_reversa_sdd/ideation.md`
+- [x] **Researcher** — personas e jornadas → `_reversa_sdd/personas.md`
+- [x] **Drafter** — PRD com requisitos e escopo → `_reversa_sdd/prd.md` (9 seções preenchidas, 0 [INDEFINIDO]; cobertura: sigilo de cliente com envio a Gemini como decisão explícita; prazo alvo 3 meses + viés custo baixo)
+- [x] **Spec-SDD (shared_kernel)** — contratos → `_reversa_sdd/sdd/shared-kernel-contracts.md` (score 100/100 ⭐; RF-01..RF-10; OQ-01..04 para o Dev 2 validar na PR)
+- [ ] **Spec-SDD (módulos)** — `document_processing` (Dev 1), `policy_analysis`, `evaluation` (Dev 2) → `_reversa_sdd/sdd/*.md` — **adiadas por decisão da sessão**: entregar contratos primeiro para o Dev 2
+- [x] **Implementação dos contratos (Fase 0)**: `src/shared_kernel/` (`version`, `identifiers`, `contracts`, `errors`) + `tests/contracts/` (8 suítes, 67 testes passando em 1.27s) + 18 fixtures JSON (9 válidas / 9 inválidas) + `pyproject.toml` + `requirements.txt` — conforme spec 100/100; RF-01..RF-10 cobertos
+- [ ] Handoff → `/reversa-forward`
 
-## Fase 3: Interpretação 🧠
+## Implementação (/reversa-forward)
 
-- [ ] **Detetive** — Arqueologia Git e ADRs retroativos
-- [ ] **Detetive** — Regras de negócio implícitas e máquinas de estado
-- [ ] **Detetive** — Matriz de permissões (RBAC/ACL)
-- [ ] **Arquiteto** — Diagramas C4 (Contexto, Containers, Componentes)
-- [ ] **Arquiteto** — ERD completo e integrações externas
-- [ ] **Arquiteto** — Spec Impact Matrix
+- [ ] Vertical slice mínimo (resumo §13): PDF simples → OCR básico → chunks → Qdrant → retrieval → 1 campo extraído → 1 comparação → tela simples
+- [ ] Quality gates (resumo §14): testes de contrato, PDF nativo/escaneado, tabela, documento duplicado, baixa confiança, falha de LLM
 
-## Fase 4: Geração 📝
+## Decisões registradas nesta sessão
 
-- [ ] **Redator** — Specs SDD por componente
-- [ ] **Redator** — OpenAPI (se aplicável)
-- [ ] **Redator** — User Stories (se aplicável)
-- [ ] **Redator** — Code/Spec Matrix
+- Linguagem: **Python** · Orquestração de agentes: **Pydantic AI**
+- LLM: **Gemini** (provedor único, incluindo embeddings)
+- Qdrant: **local via Docker** (MVP; nenhum dado sensível sai da máquina)
+- Escopo das specs desta fase: **shared_kernel + document_processing + policy_analysis + evaluation**
+- Princípios: **monólito modular, KISS, YAGNI, SDD**; comparação entre valores é **determinística** (LLM extrai/explica, jamais compara)
+- doc_level: **completo** · doc_language: Português · answer_mode: chat
 
-## Fase 5: Revisão ✅
+## Fluxos não usados (registro)
 
-- [ ] **Revisor** — Revisão cruzada de specs
-- [ ] **Revisor** — Resolução de lacunas com o usuário
-- [ ] **Revisor** — Relatório de confiança final
-
----
-
-## Agentes Independentes
-
-> Execute estes agentes quando os recursos estiverem disponíveis — podem rodar em qualquer fase.
-
-- [ ] **Visor** — Análise de interface via screenshots
-- [ ] **Data Master** — Análise completa do banco de dados
-- [ ] **Design System** — Extração de tokens de design
-- [ ] **Tracer** — Análise dinâmica (requer sistema acessível)
-
----
-
-## Próximo passo
-
-Após o Time de Descoberta concluir e o `_reversa_sdd/` estar populado, você pode disparar um dos fluxos seguintes:
-
-- `/reversa-migrate`: orquestrador do **Time de Migração** (Paradigm Advisor → Curator → Strategist → Designer → Screen Translator → Inspector). Gera as specs do sistema novo. Saída em `_reversa_sdd/migration/` e `_reversa_sdd/screens/`.
-- `/reversa-reconstructor`: gera plano bottom-up para reimplementar o software a partir das specs do legado (uma tarefa por sessão).
+- `/reversa` (extração): sem código legado; fica para o pós-implementação (fechar o ciclo 🟢).
+- `/reversa-migrate`, `/reversa-docs`, Visor/Data Master/Design System: sem material de entrada por enquanto.
