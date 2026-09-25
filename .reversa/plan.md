@@ -29,7 +29,7 @@ Regra: nenhum módulo importa o interno do outro; acesso só via `public_api.py`
 - [x] **Researcher** — personas e jornadas → `_reversa_sdd/personas.md`
 - [x] **Drafter** — PRD com requisitos e escopo → `_reversa_sdd/prd.md` (9 seções preenchidas, 0 [INDEFINIDO]; cobertura: sigilo de cliente com envio a Gemini como decisão explícita; prazo alvo 3 meses + viés custo baixo)
 - [x] **Spec-SDD (shared_kernel)** — contratos → `_reversa_sdd/sdd/shared-kernel-contracts.md` (score 100/100 ⭐; RF-01..RF-10; OQ-01..04 para o Dev 2 validar na PR)
-- [ ] **Spec-SDD (módulos)** — `document_processing` (Dev 1), `policy_analysis`, `evaluation` (Dev 2) → `_reversa_sdd/sdd/*.md` — **adiadas por decisão da sessão**: entregar contratos primeiro para o Dev 2
+- [x] **Spec-SDD (módulos)** — `document-processing.md`, `policy-analysis.md`, `evaluation.md` → `_reversa_sdd/sdd/` (todas 100/100 ⭐; handoff: tela mínima e workflow ficam para o ciclo forward — NG-05 da policy-analysis)
 - [x] **Implementação dos contratos (Fase 0)**: `src/shared_kernel/` (`version`, `identifiers`, `contracts`, `errors`) + `tests/contracts/` (8 suítes, 67 testes passando em 1.27s) + 18 fixtures JSON (9 válidas / 9 inválidas) + `pyproject.toml` + `requirements.txt` — conforme spec 100/100; RF-01..RF-10 cobertos
 - [ ] Handoff → `/reversa-forward`
 
