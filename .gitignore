@@ -1,2 +1,11 @@
 # Reversa — configurações pessoais (não versionar)
 .reversa/config.user.toml
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+.ruff_cache/
+.mypy_cache/

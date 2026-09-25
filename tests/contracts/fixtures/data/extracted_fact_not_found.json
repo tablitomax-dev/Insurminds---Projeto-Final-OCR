@@ -1,0 +1,11 @@
+{
+  "fact_id": "fact-0002",
+  "policy_id": "policy-bravo-do-002",
+  "field_code": "franquia_kickback",
+  "status": "NOT_FOUND",
+  "value": null,
+  "normalized_value": null,
+  "confidence": 0.0,
+  "evidence_ids": [],
+  "requires_human_review": true
+}

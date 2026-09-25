@@ -1,0 +1,4 @@
+{
+  "query": "consulta com top_k acima do máximo permitido",
+  "top_k": 25
+}

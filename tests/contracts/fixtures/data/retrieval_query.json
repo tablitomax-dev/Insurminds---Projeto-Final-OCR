@@ -1,0 +1,8 @@
+{
+  "query": "limite agregado por sinistro D&O política ACME",
+  "policy_id": "policy-acme-do-001",
+  "document_id": null,
+  "section_name": null,
+  "field_code": "limite_agregado",
+  "top_k": 5
+}

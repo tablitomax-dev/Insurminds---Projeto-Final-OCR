@@ -1,0 +1,39 @@
+{
+  "query": {
+    "query": "limite agregado por sinistro D&O política ACME",
+    "policy_id": "policy-acme-do-001",
+    "document_id": null,
+    "section_name": null,
+    "field_code": "limite_agregado",
+    "top_k": 5
+  },
+  "evidences": [
+    {
+      "evidence_id": "ev-native-0001",
+      "policy_id": "policy-acme-do-001",
+      "document_id": "doc-condicoes-gerais-001",
+      "page_number": 7,
+      "chunk_id": null,
+      "section_name": "Objeto do Seguro",
+      "clause_number": null,
+      "quoted_text": "Os limites máximo de agregação e máximo por aeronave são de US$ 5.000.000,00.",
+      "retrieval_score": null,
+      "ocr_confidence": null,
+      "source_type": "NATIVE_TEXT"
+    },
+    {
+      "evidence_id": "ev-ocr-0002",
+      "policy_id": "policy-acme-do-001",
+      "document_id": "doc-endosscan-002",
+      "page_number": 12,
+      "chunk_id": "chunk-0023",
+      "section_name": "Exclusões",
+      "clause_number": "4.1.3",
+      "quoted_text": "Este seguro não cobre sinistros decorrentes de auto-seguragem ou de qualquer outro mecanismo de retenção de riscos.",
+      "retrieval_score": 0.87,
+      "ocr_confidence": 0.93,
+      "source_type": "PADDLEOCR"
+    }
+  ],
+  "retrieval_run_id": "run-retrieval-0001"
+}
