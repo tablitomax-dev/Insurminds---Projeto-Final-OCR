@@ -1,0 +1,13 @@
+{
+  "evidence_id": "ev-ocr-0002",
+  "policy_id": "policy-acme-do-001",
+  "document_id": "doc-endosscan-002",
+  "page_number": 12,
+  "chunk_id": "chunk-0023",
+  "section_name": "Exclusões",
+  "clause_number": "4.1.3",
+  "quoted_text": "Este seguro não cobre sinistros decorrentes de auto-seguragem ou de qualquer outro mecanismo de retenção de riscos.",
+  "retrieval_score": 0.87,
+  "ocr_confidence": 0.93,
+  "source_type": "PADDLEOCR"
+}

@@ -1,0 +1,8 @@
+{
+  "evidence_id": "ev-invalid-page",
+  "policy_id": "policy-acme-do-001",
+  "document_id": "doc-condicoes-gerais-001",
+  "page_number": 0,
+  "quoted_text": "Trecho de página inexistente.",
+  "source_type": "NATIVE_TEXT"
+}

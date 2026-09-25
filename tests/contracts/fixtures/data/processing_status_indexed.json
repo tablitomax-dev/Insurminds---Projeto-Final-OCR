@@ -1,0 +1,6 @@
+{
+  "document_id": "doc-endosscan-002",
+  "stage": "INDEXED",
+  "progress": 0.6,
+  "message": "OCR concluído; 128 chunks indexados no Qdrant."
+}

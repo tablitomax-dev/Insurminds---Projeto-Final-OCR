@@ -1,0 +1,3 @@
+# Dependências (produção e dev — projeto ainda sem separação de stage)
+pydantic>=2,<3
+pytest>=8

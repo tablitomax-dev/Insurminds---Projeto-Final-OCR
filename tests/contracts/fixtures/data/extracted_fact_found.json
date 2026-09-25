@@ -1,0 +1,18 @@
+{
+  "fact_id": "fact-0001",
+  "policy_id": "policy-acme-do-001",
+  "field_code": "limite_agregado",
+  "status": "FOUND",
+  "value": {
+    "amount": 5000000.0,
+    "currency": "USD",
+    "raw_text": "US$ 5.000.000,00"
+  },
+  "normalized_value": {
+    "amount_brl": 27000000.0,
+    "exchange_rate_date": "2026-09-01"
+  },
+  "confidence": 0.95,
+  "evidence_ids": ["ev-native-0001"],
+  "requires_human_review": false
+}

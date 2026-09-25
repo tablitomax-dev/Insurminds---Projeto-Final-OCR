@@ -1,0 +1,14 @@
+{
+  "fact_id": "fact-invalid-no-evidence",
+  "policy_id": "policy-acme-do-001",
+  "field_code": "limite_agregado",
+  "status": "FOUND",
+  "value": {
+    "amount": 7500000.0,
+    "currency": "USD"
+  },
+  "normalized_value": null,
+  "confidence": 0.9,
+  "evidence_ids": [],
+  "requires_human_review": false
+}

@@ -1,0 +1,13 @@
+{
+  "evidence_id": "ev-native-0001",
+  "policy_id": "policy-acme-do-001",
+  "document_id": "doc-condicoes-gerais-001",
+  "page_number": 7,
+  "chunk_id": null,
+  "section_name": "Objeto do Seguro",
+  "clause_number": null,
+  "quoted_text": "Os limites máximo de agregação e máximo por aeronave são de US$ 5.000.000,00.",
+  "retrieval_score": null,
+  "ocr_confidence": null,
+  "source_type": "NATIVE_TEXT"
+}

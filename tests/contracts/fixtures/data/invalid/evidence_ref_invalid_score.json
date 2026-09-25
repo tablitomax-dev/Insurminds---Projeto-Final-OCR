@@ -1,0 +1,9 @@
+{
+  "evidence_id": "ev-invalid-score",
+  "policy_id": "policy-acme-do-001",
+  "document_id": "doc-endosscan-002",
+  "page_number": 12,
+  "quoted_text": "Trecho recuperado com score fora do intervalo.",
+  "retrieval_score": 1.5,
+  "source_type": "PADDLEOCR"
+}

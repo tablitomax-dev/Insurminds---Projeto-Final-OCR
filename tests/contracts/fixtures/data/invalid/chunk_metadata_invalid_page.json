@@ -1,0 +1,11 @@
+{
+  "chunk_id": "chunk-invalid-page",
+  "document_id": "doc-condicoes-gerais-001",
+  "policy_id": "policy-acme-do-001",
+  "page_number": 0,
+  "chunk_index": 1,
+  "source_type": "NATIVE_TEXT",
+  "ocr_confidence": null,
+  "section_name": null,
+  "metadata_version": "1.0.0"
+}

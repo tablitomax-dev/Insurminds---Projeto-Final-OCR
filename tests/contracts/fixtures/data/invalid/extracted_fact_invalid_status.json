@@ -1,0 +1,11 @@
+{
+  "fact_id": "fact-invalid-status",
+  "policy_id": "policy-acme-do-001",
+  "field_code": "limite_agregado",
+  "status": "OK",
+  "value": null,
+  "normalized_value": null,
+  "confidence": 0.5,
+  "evidence_ids": ["ev-native-0001"],
+  "requires_human_review": false
+}

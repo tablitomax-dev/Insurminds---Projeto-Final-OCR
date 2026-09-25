@@ -1,0 +1,8 @@
+{
+  "evidence_id": "ev-invalid-quoted",
+  "policy_id": "policy-acme-do-001",
+  "document_id": "doc-condicoes-gerais-001",
+  "page_number": 7,
+  "quoted_text": "",
+  "source_type": "NATIVE_TEXT"
+}
