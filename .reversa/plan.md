@@ -31,12 +31,12 @@ Regra: nenhum módulo importa o interno do outro; acesso só via `public_api.py`
 - [x] **Spec-SDD (shared_kernel)** — contratos → `_reversa_sdd/sdd/shared-kernel-contracts.md` (score 100/100 ⭐; RF-01..RF-10; OQ-01..04 para o Dev 2 validar na PR)
 - [x] **Spec-SDD (módulos)** — `document-processing.md`, `policy-analysis.md`, `evaluation.md` → `_reversa_sdd/sdd/` (todas 100/100 ⭐; handoff: tela mínima e workflow ficam para o ciclo forward — NG-05 da policy-analysis)
 - [x] **Implementação dos contratos (Fase 0)**: `src/shared_kernel/` (`version`, `identifiers`, `contracts`, `errors`) + `tests/contracts/` (8 suítes, 67 testes passando em 1.27s) + 18 fixtures JSON (9 válidas / 9 inválidas) + `pyproject.toml` + `requirements.txt` — conforme spec 100/100; RF-01..RF-10 cobertos
-- [ ] Handoff → `/reversa-forward`
+- [x] Handoff → `/reversa-forward` (iniciado em 2026-09-26: feature `001-vertical-slice-e2e`)
 
 ## Implementação (/reversa-forward)
 
-- [ ] Vertical slice mínimo (resumo §13): PDF simples → OCR básico → chunks → Qdrant → retrieval → 1 campo extraído → 1 comparação → tela simples
-- [ ] Quality gates (resumo §14): testes de contrato, PDF nativo/escaneado, tabela, documento duplicado, baixa confiança, falha de LLM
+- [x] Vertical slice mínimo (resumo §13): PDF simples → OCR básico → chunks → Qdrant → retrieval → 1 campo extraído → 1 comparação → tela simples — feature `001-vertical-slice-e2e`, 21/21 ações em `_reversa_forward/001-vertical-slice-e2e/actions.md`, suíte 137 passed / 4 skipped
+- [x] Quality gates (resumo §14): testes de contrato, PDF nativo/escaneado, documento duplicado, baixa confiança, falha de LLM (tabela fora do escopo — NG-01/PP-Structure fase posterior)
 
 ## Decisões registradas nesta sessão
 
