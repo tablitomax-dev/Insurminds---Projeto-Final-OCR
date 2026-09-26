@@ -1,0 +1,37 @@
+{
+  "policy": {
+    "policy_id": "POL-A",
+    "seguradora": "Seguradora Alfa",
+    "vigencia_inicio": "2025-01-01",
+    "vigencia_fim": "2026-01-01",
+    "fonte_documentos": "fixtures/apolice_a.pdf"
+  },
+  "documents": [
+    {"document_id": "DOC-A-1", "policy_id": "POL-A", "nome_fonte": "apolice_a.pdf"}
+  ],
+  "evidences": [
+    {"evidence_id": "EV-A-001", "policy_id": "POL-A", "document_id": "DOC-A-1", "page_number": 3, "chunk_id": "CHK-A-003", "section_name": "Limites", "clause_number": "4.1", "quoted_text": "Limite agregado de R$ 5.000.000,00 por período de seguro.", "retrieval_score": 0.93, "ocr_confidence": 0.98, "source_type": "NATIVE_TEXT"},
+    {"evidence_id": "EV-A-002", "policy_id": "POL-A", "document_id": "DOC-A-1", "page_number": 3, "chunk_id": "CHK-A-004", "section_name": "Limites", "clause_number": "4.2", "quoted_text": "Limite por sinistro: R$ 1.000.000,00.", "retrieval_score": 0.91, "ocr_confidence": 0.98, "source_type": "NATIVE_TEXT"},
+    {"evidence_id": "EV-A-003", "policy_id": "POL-A", "document_id": "DOC-A-1", "page_number": 4, "chunk_id": "CHK-A-007", "section_name": "Franquias", "clause_number": "5.1", "quoted_text": "Franquia de R$ 50.000,00 por sinistro.", "retrieval_score": 0.9, "ocr_confidence": 0.97, "source_type": "NATIVE_TEXT"},
+    {"evidence_id": "EV-A-004", "policy_id": "POL-A", "document_id": "DOC-A-1", "page_number": 2, "chunk_id": "CHK-A-002", "section_name": "Vigência", "clause_number": "2.1", "quoted_text": "Vigência de 01/01/2025 a 01/01/2026.", "retrieval_score": 0.95, "ocr_confidence": 0.99, "source_type": "NATIVE_TEXT"},
+    {"evidence_id": "EV-A-005", "policy_id": "POL-A", "document_id": "DOC-A-1", "page_number": 6, "chunk_id": "CHK-A-011", "section_name": "Sinistros", "clause_number": "8.3", "quoted_text": "Prazo de notificação de sinistro: 60 dias após o conhecimento.", "retrieval_score": 0.88, "ocr_confidence": 0.96, "source_type": "NATIVE_TEXT"},
+    {"evidence_id": "EV-A-006", "policy_id": "POL-A", "document_id": "DOC-A-1", "page_number": 2, "chunk_id": "CHK-A-001", "section_name": "Território", "clause_number": "3.2", "quoted_text": "Extensão territorial: Mundial.", "retrieval_score": 0.92, "ocr_confidence": 0.99, "source_type": "NATIVE_TEXT"},
+    {"evidence_id": "EV-A-007", "policy_id": "POL-A", "document_id": "DOC-A-1", "page_number": 7, "chunk_id": "CHK-A-013", "section_name": "Exclusões", "clause_number": "9.1", "quoted_text": "Excluem-se fraude e atos de guerra.", "retrieval_score": 0.87, "ocr_confidence": 0.95, "source_type": "PADDLEOCR"},
+    {"evidence_id": "EV-A-008", "policy_id": "POL-A", "document_id": "DOC-A-1", "page_number": 5, "chunk_id": "CHK-A-009", "section_name": "Defesa de Custos", "clause_number": "6.4", "quoted_text": "Limite de defesa de custos: R$ 500.000,00.", "retrieval_score": 0.89, "ocr_confidence": 0.97, "source_type": "NATIVE_TEXT"},
+    {"evidence_id": "EV-A-009", "policy_id": "POL-A", "document_id": "DOC-A-1", "page_number": 2, "chunk_id": "CHK-A-002", "section_name": "Retroatividade", "clause_number": "2.4", "quoted_text": "Data de retroatividade: 01/01/2015.", "retrieval_score": 0.9, "ocr_confidence": 0.99, "source_type": "NATIVE_TEXT"},
+    {"evidence_id": "EV-A-010", "policy_id": "POL-A", "document_id": "DOC-A-1", "page_number": 8, "chunk_id": "CHK-A-015", "section_name": "Reajuste", "clause_number": "10.2", "quoted_text": "Índice de reajuste anual de 4%.", "retrieval_score": 0.85, "ocr_confidence": 0.94, "source_type": "NATIVE_TEXT"},
+    {"evidence_id": "EV-A-011", "policy_id": "POL-A", "document_id": "DOC-A-1", "page_number": 8, "chunk_id": "CHK-A-016", "section_name": "Reajuste", "clause_number": "10.3", "quoted_text": "Aplicar índice de reajuste de 5% a partir do segundo ano.", "retrieval_score": 0.84, "ocr_confidence": 0.94, "source_type": "NATIVE_TEXT"}
+  ],
+  "llm_output": [
+    {"field_code": "limite_agregado", "status": "FOUND", "value": {"amount": "5000000.00", "currency": "BRL"}, "confidence": 0.95, "evidence_ids": ["EV-A-001"], "requires_human_review": false},
+    {"field_code": "limite_por_sinistro", "status": "FOUND", "value": {"amount": "1000000.00", "currency": "BRL"}, "confidence": 0.95, "evidence_ids": ["EV-A-002"], "requires_human_review": false},
+    {"field_code": "franquia", "status": "FOUND", "value": {"amount": "50000.00", "currency": "BRL"}, "confidence": 0.93, "evidence_ids": ["EV-A-003"], "requires_human_review": false},
+    {"field_code": "vigencia", "status": "FOUND", "value": {"start": "2025-01-01", "end": "2026-01-01"}, "confidence": 0.97, "evidence_ids": ["EV-A-004"], "requires_human_review": false},
+    {"field_code": "prazo_notificacao_sinistro", "status": "FOUND", "value": {"number": "60", "unit": "dias"}, "confidence": 0.9, "evidence_ids": ["EV-A-005"], "requires_human_review": false},
+    {"field_code": "extensao_territorial", "status": "FOUND", "value": {"text": "Mundial"}, "confidence": 0.96, "evidence_ids": ["EV-A-006"], "requires_human_review": false},
+    {"field_code": "exclusoes_chave", "status": "FOUND", "value": {"text": "Fraude; atos de guerra"}, "confidence": 0.9, "evidence_ids": ["EV-A-007"], "requires_human_review": false},
+    {"field_code": "limite_defesa_custos", "status": "FOUND", "value": {"amount": "500000.00", "currency": "BRL"}, "confidence": 0.94, "evidence_ids": ["EV-A-008"], "requires_human_review": false},
+    {"field_code": "retroatividade", "status": "FOUND", "value": {"date": "2015-01-01"}, "confidence": 0.92, "evidence_ids": ["EV-A-009"], "requires_human_review": false},
+    {"field_code": "indice_reajuste", "status": "AMBIGUOUS", "value": {"text": "4% ou 5%"}, "confidence": 0.4, "evidence_ids": ["EV-A-010", "EV-A-011"], "requires_human_review": true}
+  ]
+}
