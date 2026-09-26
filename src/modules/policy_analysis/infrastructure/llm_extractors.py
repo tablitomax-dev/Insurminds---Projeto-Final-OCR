@@ -19,6 +19,9 @@ DEFAULT_MODEL = "gemini-2.0-flash"
 #: Variável de ambiente com a chave da API Gemini.
 API_KEY_ENV = "GEMINI_API_KEY"
 
+#: Temperatura dos agentes (D2-P0-1): 0.0 para saída determinística.
+LLM_TEMPERATURE = 0.0
+
 _EXTRACTION_SYSTEM_PROMPT = """\
 Você é um analista de apólices D&O. Extraia o campo pedido usando SOMENTE \
 as evidências fornecidas — nunca invente informação nem evidence_id.
@@ -30,6 +33,8 @@ AMBIGUOUS quando trechos conflitam; NEEDS_REVIEW quando o valor está ilegível.
 - `value`: objeto JSON com o escalar comparável em "scalar" (número para \
 valores monetários, data ISO AAAA-MM-DD, texto para o resto) e o trecho \
 literal em "raw_text".
+- `raw_text` é CÓPIA LITERAL (substring exata) do texto da evidência citada \
+— nunca paráfrase nem valor inventado; a extração é verificada por ancoragem.
 - `confidence` entre 0 e 1.
 - `requires_human_review` = true quando houver dúvida que justifique o \
 analista confirmar.
@@ -52,12 +57,14 @@ class PydanticAiFieldExtractor:
             from pydantic_ai import Agent
             from pydantic_ai.models.google import GoogleModel
             from pydantic_ai.providers.google import GoogleProvider
+            from pydantic_ai.settings import ModelSettings
         except ImportError as exc:
             raise RuntimeError("dependência ausente: pydantic-ai") from exc
         self._agent = Agent(
             GoogleModel(model_name, provider=GoogleProvider(api_key=_resolve_api_key(api_key))),
             output_type=ExtractedFact,
             system_prompt=_EXTRACTION_SYSTEM_PROMPT,
+            model_settings=ModelSettings(temperature=LLM_TEMPERATURE),
         )
 
     def extract(self, request: ExtractionRequest) -> ExtractedFact:
@@ -65,10 +72,13 @@ class PydanticAiFieldExtractor:
         try:
             run = self._agent.run_sync(_build_extraction_prompt(request))
         except Exception as exc:  # timeout/429/indisponibilidade (EC-01)
-            raise LlmOutputError(f"falha na execução do agente de extração: {exc}") from exc
+            # Só o tipo da exceção: a mensagem pode ecoar texto de apólice (T-2a).
+            raise LlmOutputError(
+                f"EXTRACT: falha na execução do agente de extração ({type(exc).__name__})"
+            ) from exc
         output = getattr(run, "output", None)
         if not isinstance(output, ExtractedFact):
-            raise LlmOutputError("saída do LLM fora do schema ExtractedFact")
+            raise LlmOutputError("EXTRACT: saída do LLM fora do schema ExtractedFact")
         return output
 
 
@@ -80,6 +90,7 @@ class LlmExplanationGenerator:
             from pydantic_ai import Agent
             from pydantic_ai.models.google import GoogleModel
             from pydantic_ai.providers.google import GoogleProvider
+            from pydantic_ai.settings import ModelSettings
         except ImportError as exc:
             raise RuntimeError("dependência ausente: pydantic-ai") from exc
         self._agent = Agent(
@@ -89,8 +100,11 @@ class LlmExplanationGenerator:
                 "Explique a diferença entre as duas apólices para um analista, "
                 "usando SOMENTE as evidências fornecidas e citando nos "
                 "`evidence_ids` exatamente os IDs usados (evidências de ambos "
-                "os lados quando disponíveis)."
+                "os lados quando disponíveis). Se citar trechos literalmente, "
+                "use aspas duplas e copie EXATAMENTE o texto das evidências — "
+                "a explicação é verificada por ancoragem de citação."
             ),
+            model_settings=ModelSettings(temperature=LLM_TEMPERATURE),
         )
 
     def explain(
@@ -107,10 +121,13 @@ class LlmExplanationGenerator:
         try:
             run = self._agent.run_sync(prompt)
         except Exception as exc:
-            raise LlmOutputError(f"falha na execução do agente de explicação: {exc}") from exc
+            # Só o tipo da exceção: a mensagem pode ecoar texto de apólice (T-2a).
+            raise LlmOutputError(
+                f"EXPLAIN: falha na execução do agente de explicação ({type(exc).__name__})"
+            ) from exc
         output = getattr(run, "output", None)
         if not isinstance(output, _ExplanationOutput):
-            raise LlmOutputError("saída do LLM fora do schema de explicação")
+            raise LlmOutputError("EXPLAIN: saída do LLM fora do schema de explicação")
         return output.texto.strip(), [str(evidence_id) for evidence_id in output.evidence_ids]
 
 

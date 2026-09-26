@@ -75,16 +75,24 @@ class FakeEmbedder:
 
 
 class InMemoryVectorIndex:
-    """VectorIndex fake: busca real por similaridade de cosseno em memória."""
+    """VectorIndex fake: busca real por similaridade de cosseno em memória.
+
+    Também age como spy: grava cada chamada de `search` (parâmetros recebidos)
+    para o teste de contrato por parâmetro de `RetrievalQuery` (D1-P0-2).
+    """
 
     def __init__(self) -> None:
         self._chunks: dict[str, ChunkRecord] = {}
         self.delete_calls: list[str] = []
         self.ensure_collection_calls = 0
         self.upsert_calls = 0
+        self.search_calls: list[dict] = []
+        self.ensure_collection_error: Exception | None = None
 
     def ensure_collection(self) -> None:
         self.ensure_collection_calls += 1
+        if self.ensure_collection_error is not None:
+            raise self.ensure_collection_error
 
     def delete_document(self, document_id: str) -> None:
         self.delete_calls.append(document_id)
@@ -105,12 +113,26 @@ class InMemoryVectorIndex:
         top_k: int,
         policy_id: str | None = None,
         document_id: str | None = None,
+        section_name: str | None = None,
+        field_code: str | None = None,
     ) -> list[ScoredChunk]:
+        self.search_calls.append(
+            {
+                "vector": list(vector),
+                "top_k": top_k,
+                "policy_id": policy_id,
+                "document_id": document_id,
+                "section_name": section_name,
+                "field_code": field_code,
+            }
+        )
         results = []
         for record in self._chunks.values():
             if policy_id is not None and record.metadata.policy_id != policy_id:
                 continue
             if document_id is not None and record.metadata.document_id != document_id:
+                continue
+            if section_name is not None and record.metadata.section_name != section_name:
                 continue
             score = _cosine_similarity(vector, record.vector or [])
             results.append(ScoredChunk(record=record, score=score))

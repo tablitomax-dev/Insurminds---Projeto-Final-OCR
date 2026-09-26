@@ -33,6 +33,21 @@ PROGRESS_OCR_COMPLETED = 0.5
 #: Progresso publicado quando o documento termina indexado (RF-06).
 PROGRESS_DONE = 1.0
 
+#: Formato determinístico do hint de `field_code` no texto de busca (F-14).
+FIELD_CODE_HINT_TEMPLATE = "\n[campo: {field_code}]"
+
+
+def compose_search_text(query_text: str, field_code: str | None) -> str:
+    """Compõe o texto de busca de forma determinística (F-14, D1-P0-2).
+
+    `field_code` não existe no payload do chunk (contrato v1.0.0), então é
+    consumido como hint semântico concatenado ao final da consulta, no formato
+    fixo `FIELD_CODE_HINT_TEMPLATE` — mesma entrada, mesmo texto de busca.
+    """
+    if not field_code:
+        return query_text
+    return query_text + FIELD_CODE_HINT_TEMPLATE.format(field_code=field_code)
+
 
 class DocumentProcessingService:
     """Pipeline: validar → extrair → OCR → chunkar → embeddar → indexar (RF-01..RF-06)."""
@@ -120,10 +135,11 @@ class DocumentProcessingService:
                 records.append(ChunkRecord(metadata=metadata, text=chunk))
 
         try:
+            # Health-check da coleção antes de gastar embeddings (D1-P0-3d).
+            self._vector_index.ensure_collection()
             vectors = self._embedder.embed_texts([record.text for record in records])
             for record, vector in zip(records, vectors):
                 record.vector = vector
-            self._vector_index.ensure_collection()
             # Idempotência (RF-09/EC-03/D-07): limpa o estado anterior antes do upsert.
             self._vector_index.delete_document(document_id)
             self._vector_index.upsert_chunks(records)
@@ -148,13 +164,22 @@ class DocumentProcessingService:
         return indexed_status
 
     def retrieve_evidence(self, query: RetrievalQuery) -> RetrievalResult:
-        """Recupera evidências ranqueadas (RF-07); lista vazia é resposta válida (EC-07)."""
-        vector = self._embedder.embed_texts([query.query])[0]
+        """Recupera evidências ranqueadas (RF-07); lista vazia é resposta válida (EC-07).
+
+        Honra TODOS os campos de `RetrievalQuery` (F-14): `policy_id`,
+        `document_id` e `section_name` viram filtros de metadata na consulta e
+        `field_code` vira hint determinístico no texto de busca
+        (`compose_search_text`) — nada é descartado em silêncio.
+        """
+        search_text = compose_search_text(query.query, query.field_code)
+        vector = self._embedder.embed_texts([search_text])[0]
         scored_chunks = self._vector_index.search(
             vector,
             top_k=query.top_k,
             policy_id=query.policy_id,
             document_id=query.document_id,
+            section_name=query.section_name,
+            field_code=query.field_code,
         )
 
         evidences: list[EvidenceRef] = []
@@ -212,8 +237,13 @@ class DocumentProcessingService:
 
 
 def _cause(exc: Exception) -> str:
-    """Mensagem da causa da falha; nunca deixa o motivo em branco (EC-04)."""
-    return str(exc) or type(exc).__name__
+    """Causa sanitizada da falha: só o tipo da exceção (EC-04/T-2a).
+
+    NUNCA `str(exc)` — a mensagem de exceção pode conter texto de apólice.
+    O estágio (`EXTRACT:`/`OCR:`/`INDEXING:`) entra na montagem da mensagem e
+    os IDs já vão no próprio `ProcessingStatus`.
+    """
+    return type(exc).__name__
 
 
 def _clamp01(value: float) -> float:

@@ -9,9 +9,10 @@ from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
 
-from shared_kernel.contracts import EvidenceRef, ExtractedFact
+from shared_kernel.contracts import EvidenceRef
 from shared_kernel.errors import ContractNotFound
 
+from ..domain.anchoring import extract_quoted_segments, unanchored_excerpts
 from ..domain.catalog import FIELD_CATALOG, get_field_spec
 from ..domain.comparison import ComparisonResult, FieldComparison, compare_field
 from .ports import ExplanationGenerator, FactRepository, LlmOutputError
@@ -62,15 +63,18 @@ class ComparisonService:
             )
         fact_a = self._repository.get_fact(comparison.policy_id_a, field_code)
         fact_b = self._repository.get_fact(comparison.policy_id_b, field_code)
+        evidences_a = self._load_evidences(row.evidence_ids_a)
+        evidences_b = self._load_evidences(row.evidence_ids_b)
         text, cited_ids = self._explanation_generator.explain(
             row.field_code,
             row.direction,
             fact_a,
             fact_b,
-            self._load_evidences(row.evidence_ids_a),
-            self._load_evidences(row.evidence_ids_b),
+            evidences_a,
+            evidences_b,
         )
         self._validate_citations(row, cited_ids)
+        self._anchor_explanation(text, evidences_a, evidences_b)
         self._explanations[(comparison.comparison_id, field_code)] = (text, list(cited_ids))
         return text, list(cited_ids)
 
@@ -104,6 +108,29 @@ class ComparisonService:
             invalid = invalid or not cited & set(row.evidence_ids_b)
         if invalid:
             raise LlmOutputError(_INVALID_CITATION_MESSAGE)
+
+    @staticmethod
+    def _anchor_explanation(
+        text: str,
+        evidences_a: list[EvidenceRef],
+        evidences_b: list[EvidenceRef],
+    ) -> None:
+        """Ancoragem da explicação (RF-01, D2-P0-1): citação existe nos textos recuperados.
+
+        Toda citação literal (entre aspas) da explicação deve ser substring de
+        alguma evidência recuperada dos dois lados (A e B). Sem ancoragem →
+        `LlmOutputError` — a mensagem cita quantidade, nunca o texto (T-2a).
+        """
+        quotes = extract_quoted_segments(text)
+        source_texts = [
+            evidence.quoted_text for evidence in [*evidences_a, *evidences_b]
+        ]
+        missing = unanchored_excerpts(quotes, source_texts)
+        if missing:
+            raise LlmOutputError(
+                f"{_INVALID_CITATION_MESSAGE}: citação fora dos textos recuperados"
+                f" (quantidade={len(missing)})"
+            )
 
     def _render_export(self, comparison: ComparisonResult) -> str:
         rows_by_code = {row.field_code: row for row in comparison.rows}

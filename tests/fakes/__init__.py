@@ -12,6 +12,7 @@ from .policy_analysis import (
     FakeExplanationGenerator,
     FakeLlmExtractor,
     InMemoryFactRepository,
+    ScriptedLlmExtractor,
     make_evidence,
     make_fact,
 )
@@ -26,6 +27,7 @@ __all__ = [
     "InMemoryFactRepository",
     "InMemoryVectorIndex",
     "RecordingStatusSink",
+    "ScriptedLlmExtractor",
     "make_evidence",
     "make_fact",
 ]

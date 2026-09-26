@@ -9,3 +9,8 @@ __pycache__/
 venv/
 .ruff_cache/
 .mypy_cache/
+
+# Higiene de artefatos (T-2b): temporários, exports de apólice e ferramentas locais
+.tmp/
+exports/
+.tools/

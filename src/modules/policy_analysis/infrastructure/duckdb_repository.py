@@ -8,11 +8,13 @@
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import cast
 
 from shared_kernel.contracts import EvidenceRef, ExtractedFact
 
 from ..domain.catalog import FIELD_CATALOG
 from ..domain.comparison import ComparisonResult, FieldComparison
+from ..domain.review import ReviewAction, ReviewDecision
 
 #: Caminho padrão do banco local (data-delta §2).
 DEFAULT_DB_PATH = "data/facts.duckdb"
@@ -60,6 +62,19 @@ CREATE TABLE IF NOT EXISTS evidences (
   document_id VARCHAR NOT NULL,
   payload JSON,
   created_at TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS reviews (
+  review_id VARCHAR PRIMARY KEY,
+  policy_id VARCHAR NOT NULL,
+  field_code VARCHAR NOT NULL,
+  fact_id VARCHAR NOT NULL,
+  action VARCHAR NOT NULL,
+  reviewer VARCHAR NOT NULL,
+  original_value JSON,
+  corrected_value JSON,
+  evidence_ids JSON,
+  note VARCHAR,
+  reviewed_at VARCHAR
 );
 """
 
@@ -196,6 +211,50 @@ class DuckDbFactRepository:
             rows=comparisons,
         )
 
+    def save_review(self, decision: ReviewDecision) -> None:
+        """Persiste a decisão humana (auditoria: quem decidiu, quando e o quê)."""
+        self._conn.execute(
+            "DELETE FROM reviews WHERE review_id = ?", [decision.review_id]
+        )
+        self._conn.execute(
+            "INSERT INTO reviews (review_id, policy_id, field_code, fact_id, action,"
+            " reviewer, original_value, corrected_value, evidence_ids, note, reviewed_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+                decision.review_id,
+                decision.policy_id,
+                decision.field_code,
+                decision.fact_id,
+                decision.action,
+                decision.reviewer,
+                _dump(decision.original_value),
+                _dump(decision.corrected_value),
+                _dump(decision.evidence_ids),
+                decision.note,
+                decision.reviewed_at,
+            ],
+        )
+
+    def list_reviews(
+        self, policy_id: str | None = None, field_code: str | None = None
+    ) -> list[ReviewDecision]:
+        sql = (
+            "SELECT review_id, policy_id, field_code, fact_id, action, reviewer,"
+            " original_value, corrected_value, evidence_ids, note, reviewed_at FROM reviews"
+        )
+        clauses: list[str] = []
+        params: list[str] = []
+        if policy_id is not None:
+            clauses.append("policy_id = ?")
+            params.append(policy_id)
+        if field_code is not None:
+            clauses.append("field_code = ?")
+            params.append(field_code)
+        if clauses:
+            sql += " WHERE " + " AND ".join(clauses)
+        rows = self._conn.execute(sql, params).fetchall()
+        return [_row_to_review(row) for row in rows]
+
     def upsert_policy(
         self,
         policy_id: str,
@@ -228,7 +287,17 @@ def _dump(value: object) -> str | None:
 
 
 def _row_to_fact(row: tuple) -> ExtractedFact:
-    fact_id, policy_id, field_code, status, value, normalized_value, confidence, evidence_ids, requires_human_review = row
+    (
+        fact_id,
+        policy_id,
+        field_code,
+        status,
+        value,
+        normalized_value,
+        confidence,
+        evidence_ids,
+        requires_human_review,
+    ) = row
     return ExtractedFact.model_validate(
         {
             "fact_id": fact_id,
@@ -244,7 +313,36 @@ def _row_to_fact(row: tuple) -> ExtractedFact:
     )
 
 
-def _row_to_dict(row: FieldComparison) -> dict:
+def _row_to_review(row: tuple) -> ReviewDecision:
+    (
+        review_id,
+        policy_id,
+        field_code,
+        fact_id,
+        action,
+        reviewer,
+        original_value,
+        corrected_value,
+        evidence_ids,
+        note,
+        reviewed_at,
+    ) = row
+    return ReviewDecision(
+        review_id=review_id,
+        policy_id=policy_id,
+        field_code=field_code,
+        fact_id=fact_id,
+        action=cast(ReviewAction, action),
+        reviewer=reviewer,
+        reviewed_at=reviewed_at,
+        original_value=None if original_value is None else json.loads(original_value),
+        corrected_value=None if corrected_value is None else json.loads(corrected_value),
+        evidence_ids=json.loads(evidence_ids),
+        note=note,
+    )
+
+
+def _row_to_dict(row: FieldComparison) -> dict[str, object]:
     return {
         "field_code": row.field_code,
         "direction": row.direction,
