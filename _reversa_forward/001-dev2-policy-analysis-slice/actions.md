@@ -75,6 +75,7 @@
 - Composição por injeção: `ExportService` recebe o renderizador PDF (ou resolve adiado) para `application/` não importar `infrastructure/` (isolamento, RNF-05).
 - Ambiente Windows/sandbox: rodar com `PYTHONDONTWRITEBYTECODE=1` (o sandbox bloqueia escrita de `.pyc` na instalação do Python) e o demo com `PYTHONPATH=src`.
 - fpdf2 (fontes core, latin-1): textos são sanitizados (`_safe`) e o cursor é realinhado à margem esquerda a cada linha (gotcha do `multi_cell`).
+- **Vínculo com o planejamento complementar** (`_reversa_sdd/learning/plano-acao-dev2.md`, trazido do remoto em 2026-09-26): nossa entrega cobre parte do `D2-P0-2` (fila de revisão com Confirmar/Corrigir auditada — falta "Registrar divergência") e do `D2-P0-3` (normalização por tipo com NEEDS_REVIEW — faltam regras como vigência início≤fim); `D2-P0-1` está parcial (`evidence_ids` validado contra o pedido, mas sem ancoragem de substring no `quoted_text` nem temperature 0); `D2-P0-4` (evaluation + golden set) não é desta feature (NG-03). O plano complementar foi escrito sobre a implementação paralela do remoto (features 001-vertical-slice-e2e/002/003) — os 🟢 da seção "Estado atual" dele não se aplicam a este código. Divergências de decisão registradas: export **PDF** aqui vs **Markdown** lá; gate `T-1` (ruff/mypy) ainda não configurado neste branch.
 
 ## Histórico de alterações
 

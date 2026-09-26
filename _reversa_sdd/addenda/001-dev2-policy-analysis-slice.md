@@ -9,6 +9,7 @@
 
 - **Vigente desde 2026-09-26.**
 - Nenhuma linha de superação. Adendos futuros que mudarem este conteúdo devem registrar a superação aqui.
+- **Vínculo (2026-09-26):** existe planejamento complementar do Dev 2 em `_reversa_sdd/learning/plano-acao-dev2.md` (itens `D2-P0-*`..`D2-P2-*`), escrito sobre a implementação paralela do remoto (features `001-vertical-slice-e2e`, `002-p0-dev1-documental-rag`, `003-p0-dev2-analise-experiencia`). Este adendo e esta feature permanecem vigentes como registro da implementação paralela `001-dev2-policy-analysis-slice` (branch `feature/dev2-policy-analysis-slice`); o mapeamento entrega ↔ plano está nas notas do `actions.md` desta feature. Divergências abertas: export PDF (aqui) vs Markdown (lá); decisão de granularidade de specs `feature` (aqui) vs `hybrid` (lá).
 
 ## Deltas sobre `_reversa_sdd/sdd/policy-analysis.md`
 

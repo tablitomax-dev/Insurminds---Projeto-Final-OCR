@@ -31,12 +31,14 @@ Regra: nenhum módulo importa o interno do outro; acesso só via `public_api.py`
 - [x] **Spec-SDD (shared_kernel)** — contratos → `_reversa_sdd/sdd/shared-kernel-contracts.md` (score 100/100 ⭐; RF-01..RF-10; OQ-01..04 para o Dev 2 validar na PR)
 - [x] **Spec-SDD (módulos)** — `document-processing.md`, `policy-analysis.md`, `evaluation.md` → `_reversa_sdd/sdd/` (todas 100/100 ⭐; handoff: tela mínima e workflow ficam para o ciclo forward — NG-05 da policy-analysis)
 - [x] **Implementação dos contratos (Fase 0)**: `src/shared_kernel/` (`version`, `identifiers`, `contracts`, `errors`) + `tests/contracts/` (8 suítes, 67 testes passando em 1.27s) + 18 fixtures JSON (9 válidas / 9 inválidas) + `pyproject.toml` + `requirements.txt` — conforme spec 100/100; RF-01..RF-10 cobertos
-- [ ] Handoff → `/reversa-forward`
+- [x] Handoff → `/reversa-forward` (iniciado em 2026-09-26: feature `001-vertical-slice-e2e`)
 
 ## Implementação (/reversa-forward)
 
-- [ ] Vertical slice mínimo (resumo §13): PDF simples → OCR básico → chunks → Qdrant → retrieval → 1 campo extraído → 1 comparação → tela simples
-- [ ] Quality gates (resumo §14): testes de contrato, PDF nativo/escaneado, tabela, documento duplicado, baixa confiança, falha de LLM
+- [x] Vertical slice mínimo (resumo §13): PDF simples → OCR básico → chunks → Qdrant → retrieval → 1 campo extraído → 1 comparação → tela simples — feature `001-vertical-slice-e2e`, 21/21 ações em `_reversa_forward/001-vertical-slice-e2e/actions.md`, suíte 137 passed / 4 skipped
+- [x] Quality gates (resumo §14): testes de contrato, PDF nativo/escaneado, documento duplicado, baixa confiança, falha de LLM (tabela fora do escopo — NG-01/PP-Structure fase posterior)
+- [x] Núcleo do `policy_analysis` (Dev 2, implementação paralela) — feature `001-dev2-policy-analysis-slice`, 31/31 ações em `_reversa_forward/001-dev2-policy-analysis-slice/actions.md`, 120 testes passando (67 contratos da Fase 0 + 53 novos), branch `feature/dev2-policy-analysis-slice`; OQ-01..OQ-04 resolvidas (catálogo de 10 campos, regras híbridas de comparação, export PDF, agente multi-campo)
+- [x] Ações P0 dos devs 1 e 2 (features `002-p0-dev1-documental-rag` e `003-p0-dev2-analise-experiencia`) — erros tipados, retrieval honrado, ancoragem, revisão humana e evaluation (PR #4); planejamento complementar do Dev 2 em `_reversa_sdd/learning/plano-acao-dev2.md`
 
 ## Decisões registradas nesta sessão
 
