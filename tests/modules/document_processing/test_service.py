@@ -1,5 +1,7 @@
 """Testes do serviço de processamento: orquestração, status, idempotência e retrieval (RF-01..RF-09)."""
 
+import logging
+
 import pytest
 
 from fakes.document_processing import (
@@ -9,15 +11,23 @@ from fakes.document_processing import (
     InMemoryVectorIndex,
     RecordingStatusSink,
 )
-from modules.document_processing.application.ports import ScoredChunk
+from modules.document_processing.application.ports import (
+    EmbeddingError,
+    ScoredChunk,
+    TextExtractionError,
+)
 from modules.document_processing.application.service import DocumentProcessingService
 from modules.document_processing.domain.processing import ChunkRecord, PageText, build_chunk_metadata
+from modules.document_processing.public_api import _LoggingStatusSink
 from shared_kernel.contracts import RetrievalQuery
 from shared_kernel.version import CONTRACTS_VERSION
 
 NATIVE_PAGE = "A apólice D&O garante cobertura para atos administrativos e defesa jurídica dos segurados."
 MULTI_CHUNK_PAGE = "A apólice D&O cobre limites de responsabilidade e defesa jurídica. " * 30
 OCR_TEXT = "texto reconhecido pelo ocr da página escaneada com conteúdo suficiente"
+
+#: Texto de apólice que NUNCA pode aparecer em mensagem de erro/log (T-2a).
+POLICY_TEXT = "Limite agregado R$ 1.000.000"
 
 
 def _write_pdf(tmp_path, name="apolice.pdf", content=b"%PDF-1.4\nconteudo fake\n"):
@@ -179,7 +189,7 @@ def test_extraction_failure_is_classified_as_extract(tmp_path):
     status = service.process_document("doc-1", "pol-1", file_path)
 
     assert status.stage == "FAILED"
-    assert status.message == "EXTRACT: pdf trancado"
+    assert status.message == "EXTRACT: RuntimeError"  # só o tipo — nunca o texto (T-2a)
     assert index.upsert_calls == 0
     assert [s.stage for s in sink.statuses] == ["RECEIVED", "FAILED"]
 
@@ -194,7 +204,7 @@ def test_ocr_failure_is_classified_as_ocr(tmp_path):
     status = service.process_document("doc-1", "pol-1", file_path)
 
     assert status.stage == "FAILED"
-    assert status.message == "OCR: paddle estourou"
+    assert status.message == "OCR: RuntimeError"  # só o tipo — nunca o texto (T-2a)
     assert index.upsert_calls == 0
     assert [s.stage for s in sink.statuses] == ["RECEIVED", "FAILED"]
 
@@ -204,15 +214,134 @@ def test_embedder_failure_is_classified_as_indexing(tmp_path):
     service, _extractor, _ocr, embedder, index, sink = _build_service(
         {file_path: [PageText(1, NATIVE_PAGE)]}
     )
-    embedder.error = RuntimeError("gemini fora do ar")
+    embedder.error = EmbeddingError("gemini fora do ar")  # adapter traduz para a porta (D1-P0-1)
 
     status = service.process_document("doc-1", "pol-1", file_path)
 
     assert status.stage == "FAILED"
-    assert status.message == "INDEXING: gemini fora do ar"
+    assert status.message == "INDEXING: EmbeddingError"  # só o tipo — nunca o texto (T-2a)
     assert index.records == []
     assert index.upsert_calls == 0
     assert [s.stage for s in sink.statuses] == ["RECEIVED", "TEXT_EXTRACTED", "FAILED"]
+
+
+# ------------------------------------------- T-2a: anti-vazamento de texto
+
+
+def test_extractor_failure_status_never_contains_policy_text(tmp_path):
+    file_path = _write_pdf(tmp_path)
+    service, extractor, _ocr, _embedder, _index, sink = _build_service()
+    extractor.pages_by_path[file_path] = [PageText(1, NATIVE_PAGE)]
+    extractor.error = RuntimeError(POLICY_TEXT)
+
+    status = service.process_document("doc-1", "pol-1", file_path)
+
+    assert status.stage == "FAILED"
+    assert status.message == "EXTRACT: RuntimeError"
+    for published in sink.statuses:
+        assert POLICY_TEXT not in (published.message or "")
+
+
+def test_ocr_failure_status_never_contains_policy_text(tmp_path):
+    file_path = _write_pdf(tmp_path)
+    service, _extractor, ocr, _embedder, _index, sink = _build_service(
+        {file_path: [PageText(1, "curta")]}
+    )
+    ocr.error = RuntimeError(POLICY_TEXT)
+
+    status = service.process_document("doc-1", "pol-1", file_path)
+
+    assert status.stage == "FAILED"
+    assert status.message == "OCR: RuntimeError"
+    for published in sink.statuses:
+        assert POLICY_TEXT not in (published.message or "")
+
+
+def test_embedder_failure_status_never_contains_policy_text(tmp_path):
+    file_path = _write_pdf(tmp_path)
+    service, _extractor, _ocr, embedder, _index, sink = _build_service(
+        {file_path: [PageText(1, NATIVE_PAGE)]}
+    )
+    embedder.error = EmbeddingError(POLICY_TEXT)
+
+    status = service.process_document("doc-1", "pol-1", file_path)
+
+    assert status.stage == "FAILED"
+    assert status.message == "INDEXING: EmbeddingError"
+    for published in sink.statuses:
+        assert POLICY_TEXT not in (published.message or "")
+
+
+def test_failure_logs_never_contain_policy_text(tmp_path, caplog):
+    file_path = _write_pdf(tmp_path)
+    extractor = FakeTextExtractor(pages_by_path={file_path: [PageText(1, NATIVE_PAGE)]})
+    extractor.error = TextExtractionError(POLICY_TEXT)
+    sink = _LoggingStatusSink()
+    service = DocumentProcessingService(
+        extractor, FakeOcrEngine(), FakeEmbedder(), InMemoryVectorIndex(), sink
+    )
+
+    with caplog.at_level(logging.INFO, logger="document_processing"):
+        service.process_document("doc-1", "pol-1", file_path)
+
+    assert POLICY_TEXT not in caplog.text
+    assert "TextExtractionError" in caplog.text
+
+
+# ------------------------------------- D1-P0-3d: health-check da coleção
+
+
+def test_index_health_check_failure_is_classified_as_indexing_without_crash(tmp_path):
+    file_path = _write_pdf(tmp_path)
+    service, _extractor, _ocr, embedder, index, sink = _build_service(
+        {file_path: [PageText(1, NATIVE_PAGE)]}
+    )
+    index.ensure_collection_error = RuntimeError(POLICY_TEXT)
+
+    status = service.process_document("doc-1", "pol-1", file_path)
+
+    assert status.stage == "FAILED"
+    assert status.message == "INDEXING: RuntimeError"
+    assert POLICY_TEXT not in (status.message or "")
+    # health-check roda antes de gastar embeddings e aborta antes do upsert
+    assert embedder.calls == []
+    assert index.upsert_calls == 0
+    assert [s.stage for s in sink.statuses] == ["RECEIVED", "TEXT_EXTRACTED", "FAILED"]
+
+
+# --------------------------------- D1-P0-3a: isolamento entre apólices
+
+
+def test_interleaved_policies_are_isolated_on_retrieval(tmp_path):
+    path_a1 = _write_pdf(tmp_path, name="a1.pdf")
+    path_b = _write_pdf(tmp_path, name="b.pdf")
+    path_a2 = _write_pdf(tmp_path, name="a2.pdf")
+    pages = {path: [PageText(1, MULTI_CHUNK_PAGE)] for path in (path_a1, path_b, path_a2)}
+    service, _extractor, _ocr, _embedder, index, _sink = _build_service(pages)
+
+    # indexamento intercalado: A, B, A — mesmo índice, chunks vizinhos
+    service.process_document("doc-a1", "pol-a", path_a1)
+    service.process_document("doc-b1", "pol-b", path_b)
+    service.process_document("doc-a2", "pol-a", path_a2)
+
+    unfiltered = service.retrieve_evidence(
+        RetrievalQuery(query="defesa jurídica", top_k=20)
+    )
+    assert {evidence.policy_id for evidence in unfiltered.evidences} == {"pol-a", "pol-b"}
+
+    result_a = service.retrieve_evidence(
+        RetrievalQuery(query="defesa jurídica", top_k=20, policy_id="pol-a")
+    )
+    assert result_a.evidences
+    assert {evidence.policy_id for evidence in result_a.evidences} == {"pol-a"}
+    assert {evidence.document_id for evidence in result_a.evidences} <= {"doc-a1", "doc-a2"}
+
+    result_b = service.retrieve_evidence(
+        RetrievalQuery(query="defesa jurídica", top_k=20, policy_id="pol-b")
+    )
+    assert result_b.evidences
+    assert {evidence.policy_id for evidence in result_b.evidences} == {"pol-b"}
+    assert {evidence.document_id for evidence in result_b.evidences} == {"doc-b1"}
 
 
 # --------------------------------------------------------------- idempotência
@@ -329,7 +458,15 @@ def test_retrieve_evidence_clamps_score_to_contract_range():
         def upsert_chunks(self, records):
             pass
 
-        def search(self, vector, top_k, policy_id=None, document_id=None):
+        def search(
+            self,
+            vector,
+            top_k,
+            policy_id=None,
+            document_id=None,
+            section_name=None,
+            field_code=None,
+        ):
             return [
                 ScoredChunk(record=record, score=2.0),
                 ScoredChunk(record=record, score=-1.0),

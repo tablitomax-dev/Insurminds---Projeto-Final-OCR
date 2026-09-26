@@ -47,8 +47,10 @@ def test_numeric_maior_menor_igual():
 
 
 def test_date_maior_menor():
-    assert compare_field(DATE, _fact_a({"scalar": "2025-01-01"}, DATE), _fact_b({"scalar": "2024-01-01"}, DATE)).direction == "maior"
-    assert compare_field(DATE, _fact_a({"scalar": "2023-06-30"}, DATE), _fact_b({"scalar": "2024-01-01"}, DATE)).direction == "menor"
+    maior = compare_field(DATE, _fact_a({"scalar": "2025-01-01"}, DATE), _fact_b({"scalar": "2024-01-01"}, DATE))
+    menor = compare_field(DATE, _fact_a({"scalar": "2023-06-30"}, DATE), _fact_b({"scalar": "2024-01-01"}, DATE))
+    assert maior.direction == "maior"
+    assert menor.direction == "menor"
 
 
 def test_text_igual_case_insensitive_e_divergente():

@@ -2,6 +2,10 @@
 
 As implementações reais vivem em `infrastructure/`; os testes usam fakes
 determinísticos que satisfazem estruturalmente estes protocolos.
+
+Erros tipados por porta (D1-P0-1): cada adapter traduz o erro externo
+(SDK/daemon) para uma das exceções abaixo. As mensagens são SEMPRE
+sanitizadas — só tipo do erro, estágio e IDs; nunca texto de apólice (T-2a).
 """
 
 from dataclasses import dataclass
@@ -10,6 +14,26 @@ from typing import Protocol
 from shared_kernel.contracts import ProcessingStatus
 
 from ..domain.processing import ChunkRecord, PageText
+
+
+class PortError(Exception):
+    """Erro base das portas do módulo; mensagem sanitizada (T-2a)."""
+
+
+class TextExtractionError(PortError):
+    """Falha na extração de texto do arquivo (porta `TextExtractor`)."""
+
+
+class OcrError(PortError):
+    """Falha no OCR de uma página (porta `OcrEngine`)."""
+
+
+class EmbeddingError(PortError):
+    """Falha na geração de embeddings (porta `Embedder`)."""
+
+
+class IndexingError(PortError):
+    """Falha no índice vetorial (porta `VectorIndex`)."""
 
 
 @dataclass
@@ -53,7 +77,20 @@ class VectorIndex(Protocol):
         top_k: int,
         policy_id: str | None = None,
         document_id: str | None = None,
-    ) -> list[ScoredChunk]: ...
+        section_name: str | None = None,
+        field_code: str | None = None,
+    ) -> list[ScoredChunk]:
+        """Busca por similaridade com os filtros aplicados NA consulta (F-13).
+
+        - `policy_id`/`document_id`/`section_name`: filtros de metadata do
+          payload, aplicados na própria consulta (nunca em pós-filtro).
+        - `field_code`: hint determinístico de campo (F-14). O payload do chunk
+          (contrato v1.0.0) não persiste `field_code`, então o consumo efetivo
+          acontece na composição do texto de busca (`service.compose_search_text`);
+          o parâmetro é propagado explicitamente até a porta para permitir filtro
+          automático quando o campo entrar no payload — nunca descartado em silêncio.
+        """
+        ...
 
 
 class StatusSink(Protocol):

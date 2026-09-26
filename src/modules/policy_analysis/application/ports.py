@@ -16,6 +16,7 @@ from shared_kernel.contracts import (
 )
 
 from ..domain.comparison import ComparisonResult
+from ..domain.review import ReviewDecision
 
 
 class LlmOutputError(Exception):
@@ -66,3 +67,9 @@ class FactRepository(Protocol):
     def save_comparison(self, result: ComparisonResult) -> None: ...
 
     def get_comparison(self, comparison_id: str) -> ComparisonResult | None: ...
+
+    def save_review(self, decision: ReviewDecision) -> None: ...
+
+    def list_reviews(
+        self, policy_id: str | None = None, field_code: str | None = None
+    ) -> list[ReviewDecision]: ...

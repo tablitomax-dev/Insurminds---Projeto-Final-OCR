@@ -21,8 +21,10 @@ from modules.document_processing.domain.processing import PageText
 from modules.document_processing.public_api import create_document_processing
 from modules.policy_analysis.application.ports import LlmOutputError
 from modules.policy_analysis.domain.catalog import FIELD_CATALOG
-from modules.policy_analysis.infrastructure.document_retriever import DocumentProcessingRetriever
-from modules.policy_analysis.public_api import create_policy_analysis
+from modules.policy_analysis.public_api import (
+    create_document_processing_retriever,
+    create_policy_analysis,
+)
 from shared_kernel.contracts import ExtractedFact
 
 POL_A, POL_B = "pol_acme", "pol_bravo"
@@ -69,7 +71,8 @@ def _llm_result_for(request) -> ExtractedFact:
             policy_id=request.policy_id,
             field_code=request.field_code,
             status="AMBIGUOUS",
-            value={"raw_text": "prazo nao claro na apólice"},
+            # Trecho LITERAL do chunk recuperado: citação ancorada (D2-P0-1).
+            value={"raw_text": "Prazo de notificação: 30 dias."},
             normalized_value=None,
             confidence=0.4,
             evidence_ids=evidence_ids,
@@ -129,7 +132,7 @@ def stack(tmp_path):
     explainer = FakeExplanationGenerator()
     llm = _AutoLlmExtractor(result=None)
     policy_facade = create_policy_analysis(
-        retriever=DocumentProcessingRetriever(doc_facade),
+        retriever=create_document_processing_retriever(doc_facade),
         llm_extractor=llm,
         repository=repository,
         explanation_generator=explainer,

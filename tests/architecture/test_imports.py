@@ -3,6 +3,9 @@
 Regras:
 - Módulos só conversam via `public_api` do módulo alvo.
 - `document_processing` não conhece `policy_analysis`.
+- `src/ui` consome apenas fachadas públicas (F-15) — nunca `domain`/
+  `infrastructure` de módulo algum.
+- `evaluation` consome apenas a fachada pública do `policy_analysis`.
 - Dependências externas ficam em `infrastructure/` e `src/ui/`.
 """
 
@@ -13,6 +16,7 @@ from pathlib import Path
 
 SRC_DIR = Path(__file__).resolve().parents[2] / "src"
 MODULES_DIR = SRC_DIR / "modules"
+UI_DIR = SRC_DIR / "ui"
 
 EXTERNAL_LIBS = (
     "fitz",
@@ -64,10 +68,35 @@ def test_document_processing_nao_conhece_policy_analysis():
     assert not offenders, f"document_processing não pode importar policy_analysis: {offenders}"
 
 
+def test_ui_soh_usa_fachadas_publicas():
+    """F-15/RF-02: `src/ui` jamais importa `domain`/`infrastructure` de módulos."""
+    offenders = []
+    for path in sorted(UI_DIR.rglob("*.py")):
+        for imported in _imports_of(path):
+            parts = imported.split(".")
+            if parts[0] == "modules" and (len(parts) < 3 or parts[2] != "public_api"):
+                offenders.append(f"{path.name}: {imported}")
+            if ".infrastructure" in imported or ".domain" in imported:
+                offenders.append(f"{path.name}: {imported}")
+    assert not offenders, f"UI importa internals de módulo: {offenders}"
+
+
+def test_evaluation_soh_usa_fachada_do_policy_analysis():
+    """RNF-03: `evaluation` não importa internals do `policy_analysis`."""
+    offenders = []
+    for path in _module_sources("evaluation"):
+        for imported in _imports_of(path):
+            if not imported.startswith("modules.policy_analysis"):
+                continue
+            if imported != "modules.policy_analysis.public_api":
+                offenders.append(f"{path.name}: {imported}")
+    assert not offenders, f"evaluation importa internals de policy_analysis: {offenders}"
+
+
 def test_sem_dependencias_externas_fora_de_infrastructure():
     """Núcleo (domain/application/public_api) é stdlib + pydantic + shared_kernel."""
     offenders = []
-    for module in ("document_processing", "policy_analysis"):
+    for module in ("document_processing", "policy_analysis", "evaluation"):
         for layer in ("domain", "application"):
             for path in _module_sources(module, layer):
                 for imported in _imports_of(path):

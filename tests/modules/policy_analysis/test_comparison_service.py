@@ -136,6 +136,32 @@ def test_explicacao_de_lado_unilateral_e_valida():
     assert cited_ids == ["ev_a_nome"]
 
 
+def test_explicacao_com_citacao_inventada_e_rejeitada():
+    service, _, _ = _seeded_service(
+        text='O limite de A é "R$ 9.999.999,99" contra o de B.',
+        cited_ids=["ev_a_agg", "ev_b_agg"],
+    )
+    comparison = service.compare_policies("pol_a", "pol_b")
+
+    with pytest.raises(LlmOutputError) as excinfo:
+        service.explain_difference(comparison.comparison_id, "limite_agregado")
+
+    assert "R$ 9.999.999,99" not in str(excinfo.value)
+
+
+def test_explicacao_com_citacao_real_e_aceita():
+    service, _, _ = _seeded_service(
+        text='A evidência de A registra "Trecho da apólice" e a de B também.',
+        cited_ids=["ev_a_agg", "ev_b_agg"],
+    )
+    comparison = service.compare_policies("pol_a", "pol_b")
+
+    text, cited_ids = service.explain_difference(comparison.comparison_id, "limite_agregado")
+
+    assert '"Trecho da apólice"' in text
+    assert cited_ids == ["ev_a_agg", "ev_b_agg"]
+
+
 def test_export_escreve_markdown_com_todos_os_campos(tmp_path):
     service, _, _ = _seeded_service()
     comparison = service.compare_policies("pol_a", "pol_b")
