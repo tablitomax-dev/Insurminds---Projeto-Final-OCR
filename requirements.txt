@@ -1,3 +1,13 @@
-# Dependências (produção e dev — projeto ainda sem separação de stage)
+# Núcleo (testes e contratos rodam só com isto)
 pydantic>=2,<3
 pytest>=8
+
+# Extras de integração/jornada real (descomente conforme o ambiente):
+# pymupdf>=1.24          # texto nativo (PDF)
+# paddleocr>=2.7         # OCR de páginas escaneadas
+# paddlepaddle>=2.6      # backend do PaddleOCR
+# qdrant-client>=1.9     # índice vetorial local
+# duckdb>=0.10           # persistência de fatos/comparações
+# pydantic-ai>=0.0.30    # agentes de extração/explicação
+# google-generativeai>=0.7  # embeddings + LLM (Gemini)
+# streamlit>=1.35        # UI do analista

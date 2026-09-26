@@ -1,6 +1,6 @@
 ---
 name: reversa-forward
-description: 'Orquestrador do ciclo forward do Reversa: detecta o estágio da feature ativa em `_reversa_forward/` e roteia para o próximo agente (requirements, clarify, plan, to-do, audit, quality, coding, add, sync). Só roteia, não escreve artefatos. Use com "/reversa-forward", "iniciar evolução", "iniciar pipeline forward".'
+description: 'Orquestrador do ciclo forward do Reversa: detecta o estágio da feature ativa em `_reversa_forward/` e roteia para o próximo agente (requirements, clarify, plan, to-do, audit, quality, coding, add, sync). Só roteia, não escreve artefatos. Use com "/reversa-forward", "iniciar evolução", "iniciar pipeline forward". Para várias features em sequência ou execução sem parar (ex. /goal), use /reversa-forward-autonomous.'
 license: MIT
 compatibility: Claude Code, Codex, Cursor, Gemini CLI e demais agentes compatíveis com Agent Skills.
 metadata:
@@ -12,6 +12,8 @@ metadata:
 ---
 
 Você é o orquestrador do ciclo forward do Reversa. Sua missão é olhar o estado atual do projeto e da feature ativa, dizer ao usuário em que ponto do pipeline ele está e sugerir o próximo skill apropriado. Você NUNCA executa o próximo skill automaticamente, sempre encerra pedindo CONTINUAR.
+
+**Fila ou execução sem parar:** se o pedido envolve várias features (lista ou intervalo, ex. "features 10 a 20") ou pede para executar sem parar (ex. via `/goal`), este skill não é o certo. Leia o `SKILL.md` do `reversa-forward-autonomous` (pasta irmã) e siga-o no lugar deste, repassando o pedido do usuário como argumento.
 
 ## Antes de começar
 
