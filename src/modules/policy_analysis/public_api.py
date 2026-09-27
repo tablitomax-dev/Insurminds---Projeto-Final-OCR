@@ -20,10 +20,14 @@ from .application.ports import (
     LlmExtractor,
     LlmOutputError,
 )
+from .application.quality import QualityService, QualitySignalLog
 from .application.review import HumanReviewService
 from .domain.catalog import FIELD_CATALOG, get_field_spec
 from .domain.comparison import ComparisonResult, normalize_value
+from .domain.metrics import UsageMetricsCollector, UsageSummary
+from .domain.quality import SEVERITY_ORDER, Issue, QualityReport, Severity
 from .domain.review import ReviewDecision
+from .infrastructure.pricing import PRICE_REFERENCE_DATE
 
 
 class PolicyAnalysisFacade:
@@ -34,10 +38,14 @@ class PolicyAnalysisFacade:
         extraction: ExtractionService,
         comparison: ComparisonService,
         review: HumanReviewService,
+        quality: QualityService,
+        usage: UsageMetricsCollector,
     ) -> None:
         self._extraction = extraction
         self._comparison = comparison
         self._review = review
+        self._quality = quality
+        self._usage = usage
 
     def extract_field(self, policy_id: str, field_code: str) -> ExtractedFact:
         """Extrai um campo de uma apólice com evidência (RF-03)."""
@@ -119,25 +127,48 @@ class PolicyAnalysisFacade:
         """Decisões de revisão registradas (quem, quando, valor original/corrigido)."""
         return self._review.list_decisions(policy_id, field_code)
 
+    def list_issues(self, policy_id: str) -> list[Issue]:
+        """Issues de qualidade derivados dos sinais existentes (RF-01)."""
+        return self._quality.list_issues(policy_id)
+
+    def get_quality_report(self, policy_id: str) -> QualityReport:
+        """Relatório de qualidade por documento (RF-01)."""
+        return self._quality.get_quality_report(policy_id)
+
+    def get_comparison_quality_report(self, comparison_id: str) -> QualityReport:
+        """Relatório de qualidade por comparação (RF-01)."""
+        return self._quality.get_comparison_quality_report(comparison_id)
+
+    def get_usage_metrics(self, run_id: str | None = None) -> UsageSummary | None:
+        """Métricas do último run (ou do `run_id`) — tokens/custo USD/latência (RF-03)."""
+        return self._usage.summarize(run_id, price_reference_date=PRICE_REFERENCE_DATE)
+
 
 def create_policy_analysis(
     retriever: EvidenceRetriever,
     llm_extractor: LlmExtractor,
     repository: FactRepository,
     explanation_generator: ExplanationGenerator,
+    usage_collector: UsageMetricsCollector | None = None,
+    quality_signals: QualitySignalLog | None = None,
 ) -> PolicyAnalysisFacade:
     """Wiring injetável da fachada (testes e composição manual)."""
+    collector = usage_collector if usage_collector is not None else UsageMetricsCollector()
+    signals = quality_signals if quality_signals is not None else QualitySignalLog()
     return PolicyAnalysisFacade(
         extraction=ExtractionService(
             retriever=retriever,
             llm_extractor=llm_extractor,
             repository=repository,
+            quality_signals=signals,
         ),
         comparison=ComparisonService(
             repository=repository,
             explanation_generator=explanation_generator,
         ),
         review=HumanReviewService(repository=repository),
+        quality=QualityService(repository=repository, signals=signals),
+        usage=collector,
     )
 
 
@@ -172,11 +203,17 @@ def create_default_policy_analysis(
     )
 
     model = model_name or DEFAULT_MODEL
+    collector = UsageMetricsCollector()
     return create_policy_analysis(
         retriever=retriever,
-        llm_extractor=PydanticAiFieldExtractor(model_name=model, api_key=api_key),
+        llm_extractor=PydanticAiFieldExtractor(
+            model_name=model, api_key=api_key, collector=collector
+        ),
         repository=DuckDbFactRepository(db_path),
-        explanation_generator=LlmExplanationGenerator(model_name=model, api_key=api_key),
+        explanation_generator=LlmExplanationGenerator(
+            model_name=model, api_key=api_key, collector=collector
+        ),
+        usage_collector=collector,
     )
 
 
@@ -184,9 +221,14 @@ __all__ = [
     "ComparisonResult",
     "EvidenceRef",
     "ExtractedFact",
+    "Issue",
     "LlmOutputError",
     "PolicyAnalysisFacade",
+    "QualityReport",
     "ReviewDecision",
+    "SEVERITY_ORDER",
+    "Severity",
+    "UsageSummary",
     "create_default_policy_analysis",
     "create_document_processing_retriever",
     "create_policy_analysis",

@@ -1,10 +1,10 @@
 {
   "schema-version": 1,
-  "feature-dir": "_reversa_forward/001-vertical-slice-e2e",
-  "feature-id": "001",
-  "short-name": "vertical-slice-e2e",
-  "started-at": "2026-09-26T11:48:24Z",
-  "current-stage": "requirements",
-  "stages-completed": [],
+  "feature-dir": "_reversa_forward/005-p1-dev1-proveniencia",
+  "feature-id": "005",
+  "short-name": "p1-dev1-proveniencia",
+  "started-at": "2026-09-26T15:00:00-03:00",
+  "current-stage": "coding",
+  "stages-completed": ["requirements", "plan", "to-do"],
   "paused-features": []
 }

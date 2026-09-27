@@ -380,7 +380,11 @@ class QdrantVectorIndex:
 
 
 def _payload_from_record(record: ChunkRecord) -> dict:
-    """Payload do Qdrant conforme `data-delta.md` (IDs + texto + origem)."""
+    """Payload do Qdrant conforme `data-delta.md` (IDs + texto + origem).
+
+    `content_fingerprint` (contrato v1.1.0) é opcional: chunks legados ou sem
+    texto estável gravam `None` e voltam `None` (retrocompatível).
+    """
     metadata = record.metadata
     return {
         "chunk_id": metadata.chunk_id,
@@ -392,12 +396,17 @@ def _payload_from_record(record: ChunkRecord) -> dict:
         "metadata_version": metadata.metadata_version,
         "source_type": metadata.source_type,
         "ocr_confidence": metadata.ocr_confidence,
+        "content_fingerprint": metadata.content_fingerprint,
         "text": record.text,
     }
 
 
 def _record_from_payload(payload: dict, vector) -> ChunkRecord:
-    """Reconstrói o `ChunkRecord` a partir do payload persistido (RF-05)."""
+    """Reconstrói o `ChunkRecord` a partir do payload persistido (RF-05).
+
+    `.get` em `content_fingerprint`: payload gravado antes de v1.1.0 não tem a
+    chave e continua válido com `None` (F-14: propagação provada ponta a ponta).
+    """
     metadata = ChunkMetadata(
         chunk_id=payload["chunk_id"],
         document_id=payload["document_id"],
@@ -408,6 +417,7 @@ def _record_from_payload(payload: dict, vector) -> ChunkRecord:
         ocr_confidence=payload["ocr_confidence"],
         section_name=payload["section_name"],
         metadata_version=payload["metadata_version"],
+        content_fingerprint=payload.get("content_fingerprint"),
     )
     return ChunkRecord(
         metadata=metadata,

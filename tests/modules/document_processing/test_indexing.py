@@ -14,6 +14,8 @@ from dataclasses import dataclass, field
 import pytest
 
 from modules.document_processing.application.ports import EmbeddingError, IndexingError
+from modules.document_processing.domain.chunk_fingerprint import compute_content_fingerprint
+from modules.document_processing.domain.processing import ChunkRecord, build_chunk_metadata
 
 #: Texto de apólice que NUNCA pode aparecer em mensagem de erro (T-2a).
 POLICY_TEXT = "Limite agregado R$ 1.000.000"
@@ -391,3 +393,45 @@ def test_qdrant_ensure_collection_failure_is_indexing_error(qdrant):
         qdrant.index.ensure_collection()
 
     assert qdrant.state.created_collections == []
+
+
+# ----------------- D1-P1-1d: round-trip do content_fingerprint (v1.1.0)
+
+
+def _record_com_fingerprint(text="Limite agregado da apólice"):
+    """Chunk como o pipeline monta: fingerprint = sha256 do texto do chunk."""
+    metadata = build_chunk_metadata(
+        chunk_id="doc_fp:p1:c0",
+        document_id="doc_fp",
+        policy_id="pol_fp",
+        page_number=1,
+        chunk_index=0,
+        source_type="NATIVE_TEXT",
+        ocr_confidence=None,
+    )
+    metadata.content_fingerprint = compute_content_fingerprint(text)
+    return ChunkRecord(metadata=metadata, text=text, vector=[0.1, 0.2])
+
+
+def test_round_trip_gravar_recuperar_confere_sha256_do_texto(qdrant, indexing):
+    record = _record_com_fingerprint()
+
+    qdrant.index.upsert_chunks([record])
+    point = qdrant.state.upsert_calls[0]["points"][0]
+    assert point.payload["content_fingerprint"] == record.metadata.content_fingerprint
+
+    restored = indexing._record_from_payload(point.payload, point.vector)
+    # RF-02: o resumo recuperado confere com o sha256 do texto recuperado
+    assert restored.metadata.content_fingerprint == compute_content_fingerprint(restored.text)
+    assert restored.text == record.text
+
+
+def test_payload_legado_sem_content_fingerprint_volta_none(indexing):
+    record = _record_com_fingerprint()
+    payload = indexing._payload_from_record(record)
+    payload.pop("content_fingerprint")  # chunk gravado antes de v1.1.0
+
+    restored = indexing._record_from_payload(payload, record.vector)
+
+    assert restored.metadata.content_fingerprint is None  # retrocompatível
+    assert restored.text == record.text

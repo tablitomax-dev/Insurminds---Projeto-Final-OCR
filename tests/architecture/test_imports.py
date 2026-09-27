@@ -5,6 +5,8 @@ Regras:
 - `document_processing` não conhece `policy_analysis`.
 - `src/ui` consome apenas fachadas públicas (F-15) — nunca `domain`/
   `infrastructure` de módulo algum.
+- `src/composition_root` é o único ponto de wiring e também só consome
+  fachadas públicas (D2-P1-4 — regra arquitetural cobre TODO o alvo, F-15).
 - `evaluation` consome apenas a fachada pública do `policy_analysis`.
 - Dependências externas ficam em `infrastructure/` e `src/ui/`.
 """
@@ -17,6 +19,7 @@ from pathlib import Path
 SRC_DIR = Path(__file__).resolve().parents[2] / "src"
 MODULES_DIR = SRC_DIR / "modules"
 UI_DIR = SRC_DIR / "ui"
+COMPOSITION_DIR = SRC_DIR / "composition_root"
 
 EXTERNAL_LIBS = (
     "fitz",
@@ -79,6 +82,19 @@ def test_ui_soh_usa_fachadas_publicas():
             if ".infrastructure" in imported or ".domain" in imported:
                 offenders.append(f"{path.name}: {imported}")
     assert not offenders, f"UI importa internals de módulo: {offenders}"
+
+
+def test_composition_root_soh_usa_fachadas_publicas():
+    """D2-P1-4/RF-07: o wiring único também só consome fachadas públicas."""
+    offenders = []
+    for path in sorted(COMPOSITION_DIR.rglob("*.py")):
+        for imported in _imports_of(path):
+            parts = imported.split(".")
+            if parts[0] == "modules" and (len(parts) < 3 or parts[2] != "public_api"):
+                offenders.append(f"{path.name}: {imported}")
+            if ".infrastructure" in imported or ".domain" in imported:
+                offenders.append(f"{path.name}: {imported}")
+    assert not offenders, f"composition_root importa internals de módulo: {offenders}"
 
 
 def test_evaluation_soh_usa_fachada_do_policy_analysis():
