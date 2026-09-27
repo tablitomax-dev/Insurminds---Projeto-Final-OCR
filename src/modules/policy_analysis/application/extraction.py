@@ -22,6 +22,7 @@ from ..domain.catalog import FieldSpec, get_field_spec
 from ..domain.comparison import normalize_value
 from ..domain.rules import RuleViolation, validate_fact
 from .ports import EvidenceRetriever, FactRepository, LlmExtractor, LlmOutputError
+from .quality import QualitySignalLog
 
 #: Quantidade de evidências recuperadas por campo (top_k do retrieval).
 TOP_K = 5
@@ -44,10 +45,12 @@ class ExtractionService:
         retriever: EvidenceRetriever,
         llm_extractor: LlmExtractor,
         repository: FactRepository,
+        quality_signals: QualitySignalLog | None = None,
     ) -> None:
         self._retriever = retriever
         self._llm_extractor = llm_extractor
         self._repository = repository
+        self._quality_signals = quality_signals
 
     def extract_field(self, policy_id: str, field_code: str) -> ExtractedFact:
         """Extrai um campo de uma apólice, sempre ancorado em evidência (RF-03)."""
@@ -84,7 +87,15 @@ class ExtractionService:
             evidences=result.evidences,
             schema_version=CONTRACTS_VERSION,
         )
-        fact = self._validate_output(self._llm_extractor.extract(request), request)
+        try:
+            fact = self._validate_output(self._llm_extractor.extract(request), request)
+        except LlmOutputError as error:
+            # Sinal CRÍTICO para o QualityReport (D2-P1-1b) — motivo já sanitizado.
+            if self._quality_signals is not None:
+                self._quality_signals.record_extraction_failure(
+                    policy_id, field_code, str(error)
+                )
+            raise
         if fact.status == "FOUND" and not fact.normalized_value:
             fact = fact.model_copy(
                 update={"normalized_value": normalize_value(spec, fact.value)}

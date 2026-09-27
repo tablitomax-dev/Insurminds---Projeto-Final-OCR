@@ -5,13 +5,21 @@ determinística em `domain/comparison.py`. Os imports de `pydantic_ai` são
 lazy: sem lib ou sem chave de API a instanciação falha com `RuntimeError`.
 """
 
+import json
+import logging
 import os
+import time
 
 from pydantic import BaseModel, Field
 
 from shared_kernel.contracts import EvidenceRef, ExtractedFact, ExtractionRequest
 
 from ..application.ports import LlmOutputError
+from ..domain.metrics import KIND_EXPLAIN, KIND_EXTRACT, UsageMetricsCollector
+from .pricing import PRICE_REFERENCE_DATE, compute_cost_usd
+
+#: Log estruturado de métricas (D2-P1-2): só números, modelo e IDs (T-2a).
+usage_logger = logging.getLogger("policy_analysis.usage")
 
 #: Modelo Gemini padrão do vertical slice.
 DEFAULT_MODEL = "gemini-2.0-flash"
@@ -52,7 +60,12 @@ class _ExplanationOutput(BaseModel):
 class PydanticAiFieldExtractor:
     """Agente Pydantic AI que extrai um campo produzindo `ExtractedFact` validado."""
 
-    def __init__(self, model_name: str = DEFAULT_MODEL, api_key: str | None = None) -> None:
+    def __init__(
+        self,
+        model_name: str = DEFAULT_MODEL,
+        api_key: str | None = None,
+        collector: UsageMetricsCollector | None = None,
+    ) -> None:
         try:
             from pydantic_ai import Agent
             from pydantic_ai.models.google import GoogleModel
@@ -60,6 +73,8 @@ class PydanticAiFieldExtractor:
             from pydantic_ai.settings import ModelSettings
         except ImportError as exc:
             raise RuntimeError("dependência ausente: pydantic-ai") from exc
+        self._model_name = model_name
+        self._collector = collector if collector is not None else UsageMetricsCollector()
         self._agent = Agent(
             GoogleModel(model_name, provider=GoogleProvider(api_key=_resolve_api_key(api_key))),
             output_type=ExtractedFact,
@@ -69,6 +84,7 @@ class PydanticAiFieldExtractor:
 
     def extract(self, request: ExtractionRequest) -> ExtractedFact:
         """Extrai o campo do request; saída fora do schema nunca vira fato (RF-09)."""
+        started = time.perf_counter()
         try:
             run = self._agent.run_sync(_build_extraction_prompt(request))
         except Exception as exc:  # timeout/429/indisponibilidade (EC-01)
@@ -76,16 +92,23 @@ class PydanticAiFieldExtractor:
             raise LlmOutputError(
                 f"EXTRACT: falha na execução do agente de extração ({type(exc).__name__})"
             ) from exc
+        latency_ms = int((time.perf_counter() - started) * 1000)
         output = getattr(run, "output", None)
         if not isinstance(output, ExtractedFact):
             raise LlmOutputError("EXTRACT: saída do LLM fora do schema ExtractedFact")
+        _record_usage(self._collector, KIND_EXTRACT, self._model_name, run, latency_ms)
         return output
 
 
 class LlmExplanationGenerator:
     """Agente que explica a diferença entre 2 apólices citando evidências (RF-07)."""
 
-    def __init__(self, model_name: str = DEFAULT_MODEL, api_key: str | None = None) -> None:
+    def __init__(
+        self,
+        model_name: str = DEFAULT_MODEL,
+        api_key: str | None = None,
+        collector: UsageMetricsCollector | None = None,
+    ) -> None:
         try:
             from pydantic_ai import Agent
             from pydantic_ai.models.google import GoogleModel
@@ -93,6 +116,8 @@ class LlmExplanationGenerator:
             from pydantic_ai.settings import ModelSettings
         except ImportError as exc:
             raise RuntimeError("dependência ausente: pydantic-ai") from exc
+        self._model_name = model_name
+        self._collector = collector if collector is not None else UsageMetricsCollector()
         self._agent = Agent(
             GoogleModel(model_name, provider=GoogleProvider(api_key=_resolve_api_key(api_key))),
             output_type=_ExplanationOutput,
@@ -118,6 +143,7 @@ class LlmExplanationGenerator:
     ) -> tuple[str, list[str]]:
         """Devolve (texto da explicação, evidence_ids citados)."""
         prompt = _build_explanation_prompt(field_code, direction, fact_a, fact_b, evidences_a, evidences_b)
+        started = time.perf_counter()
         try:
             run = self._agent.run_sync(prompt)
         except Exception as exc:
@@ -125,10 +151,73 @@ class LlmExplanationGenerator:
             raise LlmOutputError(
                 f"EXPLAIN: falha na execução do agente de explicação ({type(exc).__name__})"
             ) from exc
+        latency_ms = int((time.perf_counter() - started) * 1000)
         output = getattr(run, "output", None)
         if not isinstance(output, _ExplanationOutput):
             raise LlmOutputError("EXPLAIN: saída do LLM fora do schema de explicação")
+        _record_usage(self._collector, KIND_EXPLAIN, self._model_name, run, latency_ms)
         return output.texto.strip(), [str(evidence_id) for evidence_id in output.evidence_ids]
+
+
+def _usage_tokens(run: object) -> tuple[int, int]:
+    """Lê (tokens de entrada, tokens de saída) do resultado do agente.
+
+    Defensivo entre versões do SDK (`usage()` método ou propriedade; nomes
+    `request/response` ou `prompt/completion`): ausência vira (0, 0).
+    """
+    usage = getattr(run, "usage", None)
+    if callable(usage):
+        try:
+            usage = usage()
+        except Exception:  # noqa: BLE001 — métrica nunca derruba a extração
+            usage = None
+    if usage is None:
+        return 0, 0
+    request_tokens = getattr(usage, "request_tokens", None) or getattr(
+        usage, "prompt_tokens", 0
+    )
+    response_tokens = getattr(usage, "response_tokens", None) or getattr(
+        usage, "completion_tokens", 0
+    )
+    return int(request_tokens or 0), int(response_tokens or 0)
+
+
+def _record_usage(
+    collector: UsageMetricsCollector,
+    kind: str,
+    model_name: str,
+    run: object,
+    latency_ms: int,
+) -> None:
+    """Registra a chamada no coletor e no log estruturado (D2-P1-2, T-2a).
+
+    Só números, modelo e IDs entram na métrica/log — nunca texto de apólice.
+    """
+    request_tokens, response_tokens = _usage_tokens(run)
+    record = collector.record(
+        kind=kind,
+        model_name=model_name,
+        request_tokens=request_tokens,
+        response_tokens=response_tokens,
+        latency_ms=latency_ms,
+        cost_usd=compute_cost_usd(model_name, request_tokens, response_tokens),
+    )
+    usage_logger.info(
+        "usage %s",
+        json.dumps(
+            {
+                "run_id": record.run_id,
+                "kind": record.kind,
+                "model_name": record.model_name,
+                "request_tokens": record.request_tokens,
+                "response_tokens": record.response_tokens,
+                "latency_ms": record.latency_ms,
+                "cost_usd": record.cost_usd,
+                "price_reference_date": PRICE_REFERENCE_DATE,
+            },
+            ensure_ascii=False,
+        ),
+    )
 
 
 def _resolve_api_key(api_key: str | None) -> str:

@@ -77,6 +77,11 @@ class ChunkMetadata(BaseModel):
     ocr_confidence: float | None = Field(default=None, ge=0, le=1)
     section_name: str | None = None
     metadata_version: str = Field(min_length=1)
+    #: Proveniência (v1.1.0): sha256 hex (64 chars) do **texto do chunk**.
+    #: `None` ⇒ chunk indexado antes de v1.1.0 ou fonte sem texto estável —
+    #: consumidores não podem exigir o campo. Divergência entre o resumo gravado
+    #: e o do texto recuperado é sinal de alerta, nunca exceção.
+    content_fingerprint: str | None = None
 
 
 class RetrievalQuery(BaseModel):

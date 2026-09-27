@@ -9,6 +9,7 @@ from pathlib import Path
 
 from shared_kernel.contracts import EvidenceRef, ProcessingStatus, RetrievalQuery, RetrievalResult
 
+from ..domain.chunk_fingerprint import compute_content_fingerprint
 from ..domain.processing import (
     ChunkRecord,
     build_chunk_metadata,
@@ -132,6 +133,8 @@ class DocumentProcessingService:
                     source_type=source_type,
                     ocr_confidence=ocr_confidence,
                 )
+                # Proveniência (contrato v1.1.0): sha256 do texto do chunk.
+                metadata.content_fingerprint = compute_content_fingerprint(chunk)
                 records.append(ChunkRecord(metadata=metadata, text=chunk))
 
         try:
