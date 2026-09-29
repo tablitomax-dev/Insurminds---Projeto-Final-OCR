@@ -89,7 +89,7 @@ def main() -> None:
         extraction_agent,
         explanation_agent,
         db_path=str(REPO_ROOT / "output" / "demo.duckdb"),
-        output_dir=str(REPO_ROOT / "output"),
+        output_dir=str(REPO_ROOT / "exports"),
     )
 
     print(f"== Extração ({policy_a}) ==")

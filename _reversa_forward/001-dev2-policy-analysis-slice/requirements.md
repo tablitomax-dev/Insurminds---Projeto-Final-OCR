@@ -152,7 +152,7 @@ Cenário: Extração consome apenas a fachada pública do módulo documental
 - **Q:** [OQ-03] Qual tabela inicial de regras de comparação por tipo de valor?
   **R:** Híbrida: numérico, moeda e período seguem regra determinística normalizada (moeda para BRL pela data da apólice; período por datas e duração); texto livre compara igual/divergente após normalização e, havendo divergência, a explicação detalha — a semântica fica com o analista.
 - **Q:** [OQ-04] Qual formato do export da defesa da análise?
-  **R:** Documento PDF standalone. — **Atualizado (2026-09-26):** decisão revisada para **Markdown standalone**, alinhando com a definição do fluxo paralelo (`_reversa_forward/001-vertical-slice-e2e/`) e fechando a divergência de decisão aberta.
+  **R:** Documento PDF standalone. — **Atualizado (2026-09-26):** decisão revisada para **Markdown standalone (`exports/<ComparisonId>.md`)**, alinhando com a definição do fluxo paralelo (`_reversa_forward/001-vertical-slice-e2e/`) e fechando a divergência de decisão aberta.
 - **Q:** [OQ-02] Qual estratégia de prompts dos agentes de extração?
   **R:** Agente multi-campo: uma única chamada de LLM por apólice extrai todos os campos do catálogo.
 

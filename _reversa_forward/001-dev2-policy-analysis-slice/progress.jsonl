@@ -33,3 +33,4 @@
 {"ts":"2026-09-29T23:13:22Z","action":"T024","status":"corrected","note":"pdf_export.py removido; markdown_export.py criado"}
 {"ts":"2026-09-29T23:13:22Z","action":"T025","status":"corrected","note":"export_comparison gera comparison_<id>.md"}
 {"ts":"2026-09-29T23:13:22Z","action":"T029","status":"corrected","note":"E2E atualizado para export Markdown"}
+{"ts":"2026-09-29T23:22:39Z","action":"T025","status":"corrected","note":"caminho do export alinhado ao fluxo paralelo: exports/<ComparisonId>.md; OQ-04 fechada na spec policy-analysis.md"}

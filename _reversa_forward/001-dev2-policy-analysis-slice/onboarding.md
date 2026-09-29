@@ -54,7 +54,7 @@ python -m modules.policy_analysis.demo
 O script demonstração (entregue no coding) executa: extração dos 10 campos das 2 apólices fixture → comparação determinística → explicação por diferença → export do PDF.
 
 1. Confira o terminal: `ComparisonId` e resultado por campo.
-2. Abra o Markdown gerado em `output/comparison_<ComparisonId>.md` — deve listar todos os 10 campos, inclusive ausentes, com evidência citada.
+2. Abra o Markdown gerado em `exports/<ComparisonId>.md` — deve listar todos os 10 campos, inclusive ausentes, com evidência citada.
 
 ## 6. Testar com a fachada real do Dev 1 (quando disponível)
 
@@ -72,4 +72,4 @@ Apena a origem da evidência muda (RF-10); o restante do fluxo é idêntico.
 | `Python não foi encontrado` | Python não instalado (só o stub da Microsoft Store) | Instalar Python 3.12 e reabrir o terminal |
 | Erro de import de `shared_kernel` | venv não ativado ou pytest fora da raiz | ativar venv e rodar na raiz do repo |
 | `GEMINI_API_KEY ausente` | `.env` não criado | criar `.env` ou usar modo mock (`EVIDENCE_SOURCE=mock`, padrão) |
-| Export não gera | pasta `output/` inexistente | criada automaticamente pelo demo; checar permissão de escrita |
+| Export não gera | pasta `exports/` inexistente | criada automaticamente pelo demo; checar permissão de escrita |
