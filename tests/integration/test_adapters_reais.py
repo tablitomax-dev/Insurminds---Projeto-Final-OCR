@@ -56,7 +56,14 @@ def test_qdrant_roundtrip_basico():
     from modules.document_processing.domain.processing import ChunkRecord, build_chunk_metadata
     from modules.document_processing.infrastructure.indexing import QdrantVectorIndex
 
-    index = QdrantVectorIndex(url=os.environ["INTEGRATION_QDRANT_URL"], vector_size=8)
+    alvo = os.environ["INTEGRATION_QDRANT_URL"]
+    if alvo == ":memory:":
+        # Modo embutido do qdrant-client: cliente real, sem servidor (offline).
+        from qdrant_client import QdrantClient
+
+        index = QdrantVectorIndex(vector_size=8, client=QdrantClient(":memory:"))
+    else:
+        index = QdrantVectorIndex(url=alvo, vector_size=8)
     metadata = build_chunk_metadata(
         chunk_id="doc_it:p1:c0",
         document_id="doc_it",

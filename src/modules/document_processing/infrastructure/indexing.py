@@ -246,6 +246,10 @@ class QdrantVectorIndex:
     Sem retry (D1-P0-1): Docker local + idempotência delete+upsert cobrem
     reprocessamento. Filtros (`policy_id`/`document_id`/`section_name`) vão no
     `query_filter` da própria consulta — nunca em pós-filtro (F-13).
+
+    `client` é opcional (injeção para testes de integração): um
+    `QdrantClient(":memory:")`/`path=...` embutido é o MESMO cliente real, só
+    que sem servidor — índice vetorial local, ainda mais offline que o Docker.
     """
 
     def __init__(
@@ -254,6 +258,7 @@ class QdrantVectorIndex:
         vector_size: int = DEFAULT_VECTOR_SIZE,
         collection_name: str = COLLECTION_NAME,
         api_key: str | None = None,
+        client: Any | None = None,
     ) -> None:
         try:
             from qdrant_client import QdrantClient
@@ -263,7 +268,7 @@ class QdrantVectorIndex:
                 "dependência ausente: qdrant-client — instale para usar este adapter"
             ) from exc
         self._models = qdrant_models
-        self._client = QdrantClient(url=url, api_key=api_key)
+        self._client = client if client is not None else QdrantClient(url=url, api_key=api_key)
         self._vector_size = vector_size
         self._collection_name = collection_name
 

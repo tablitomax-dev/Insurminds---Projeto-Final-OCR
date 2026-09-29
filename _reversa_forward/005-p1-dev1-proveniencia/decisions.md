@@ -22,6 +22,16 @@
 | E-05 | Aceite da caixa postal registrado por **decisão humana** após escalada (silêncio do Dev 2 em 1 dia útil) | prosseguir sem registro; aguardar indefinidamente | Convenção §5.2: silêncio = escalada ao humano; o humano (pbena) autorizou seguir em 2026-09-27 — registro em `contract-delta-chunkmetadata.md` |
 | E-06 | `metadata.content_fingerprint` atribuído depois de `build_chunk_metadata` (modelo pydantic mutável) | novo parâmetro na função do domínio | Menor delta possível; o modelo continua fechado (`extra="forbid"`) e o campo é do contrato v1.1.0 |
 
+## 2.1 Decisões da validação pós-merge (2026-09-27, PR #5)
+
+| ID | Decisão | Escolhas descartadas | Porquê |
+|----|---------|----------------------|--------|
+| E-07 | `QdrantVectorIndex` aceita `client` opcional injetado; o teste opt-in usa `QdrantClient(":memory:")` (modo embutido) quando `INTEGRATION_QDRANT_URL=:memory:` | exigir Docker/Qdrant servidor para toda validação | O cliente embutido é o MESMO `qdrant-client` real, só que sem servidor — índice local, ainda mais offline que o Docker; sem Docker no ambiente, era o único jeito de exercitar o índice real |
+| E-08 | O caso do "escaneado" diagnostica a falha de OCR e pula **somente** na limitação conhecida do PaddlePaddle no Windows/CPU (`NotImplementedError` do executor PIR/oneDNN, `onednn_instruction.cc`); qualquer outra causa continua como falha real | deixar o teste vermelho; transformar toda falha de OCR em skip | O bug é de runtime do PaddlePaddle em Windows/CPU (sobrevive a `FLAGS_enable_pir_api=0`, `FLAGS_enable_pir_in_executor=0`, `FLAGS_use_mkldnn=0`) — mascarar falha real seria pior que um skip com razão explícita |
+| E-09 | Extras de integração instaladas em `.tools/pylibs` (dentro do workspace) com cache do Paddle em `PADDLE_PDX_CACHE_HOME=.tools/paddlex-home` | instalar no site-packages do usuário | O sandbox bloqueia escrita fora do workspace; `.tools/` já é a casa das ferramentas do repo (ruff/mypy) |
+
+**Resultado da validação** (`INTEGRATION_QDRANT_URL=:memory:`, sem Docker, sem rede de embeddings): `pytest -m integration` → **3 passed, 3 skipped** — o caso do PDF digital rodou o pipeline real ponta a ponta (PyMuPDF → chunking → fingerprint → Qdrant real embutido → busca → sha256 confere); o "escaneado" pula pela limitação do PaddlePaddle (E-08); os demais skips são os já conhecidos (duckdb/Gemini key).
+
 ## 3. Rastreabilidade
 
 - Caixa postal (aceite registrado): `_reversa_forward/005-p1-dev1-proveniencia/contract-delta-chunkmetadata.md`
