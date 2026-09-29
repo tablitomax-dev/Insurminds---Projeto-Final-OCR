@@ -36,13 +36,14 @@ Detalhes: moeda usa `Decimal` (nunca `float`) e normalização por taxa injetáv
 
 Padrão aplicável: **structured output + validação pós-resposta**. O prompt exige que cada afirmação da explicação cite `evidence_ids` das evidências recebidas; a saída é validada contra schema (todo `evidence_id` citado deve existir nos fatos comparados). Explicação inválida é rejeitada e reexecutada (máximo configurável), depois vira falha classificada. Referência: princípios de "grounded generation" (resposta ancorada em contexto fornecido).
 
-### 2.4 Export PDF
+### 2.4 Export do resumo da comparação
 
-| Biblioteca | Prós | Contras | Destino |
-|------------|------|---------|---------|
-| `fpdf2` | Leve, pura Python, API simples, sem dependências de sistema | Recursos gráficos limitados | **escolhida** |
-| `reportlab` | Maduro, layout rico | Pesado; curva de aprendizado | descartada |
+| Alternativa | Prós | Contras | Destino |
+|-------------|------|---------|---------|
+| `fpdf2` (PDF) | Leve, pura Python, sem dependências de sistema | Recursos gráficos limitados; gotchas de encoding/`multi_cell` | descartada (2026-09-26) |
+| `reportlab` (PDF) | Maduro, layout rico | Pesado; curva de aprendizado | descartada |
 | `weasyprint` (HTML→PDF) | Layout CSS | Exige libs nativas (Pango/Cairo) — atrito no Windows | descartada |
+| **Markdown** (renderizador próprio) | Abre em qualquer lugar; versionável/auditável; sem dependências; alinhado com o fluxo paralelo | Sem layout de apresentação | **escolhido (decisão revisada em 2026-09-26, OQ-04)** |
 
 ### 2.5 Persistência DuckDB
 

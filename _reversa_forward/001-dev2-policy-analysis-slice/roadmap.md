@@ -7,7 +7,7 @@
 
 ## 1. Resumo da abordagem
 
-🟡 Criar o módulo `src/modules/policy_analysis/` em camadas (domain, application, infrastructure, public_api), seguindo a arquitetura do resumo §7 e a fachada definida em `_reversa_sdd/sdd/policy-analysis.md#8`. O módulo consome apenas `shared_kernel.contracts` (Fase 0, já implementada) e a fachada `document_processing.public_api` do Dev 1, atrás de uma porta `EvidenceSource` que aceita evidências mockadas (RF-10) — desbloqueando o desenvolvimento em paralelo. A extração usa um agente multi-campo (1 chamada de LLM por apólice, decisão OQ-02) com saída estruturada validada por Pydantic. A comparação é uma função pura determinística em domain, sem LLM (RN-01), com comparadores por tipo de valor. Persistência em DuckDB com schema auto-criado e IDs do shared_kernel. Explicação por LLM com citação obrigatória de evidência dos dois lados e export final em PDF standalone. Tudo coberto por pytest com fixtures sintéticas, na branch `feature/dev2-policy-analysis`.
+🟡 Criar o módulo `src/modules/policy_analysis/` em camadas (domain, application, infrastructure, public_api), seguindo a arquitetura do resumo §7 e a fachada definida em `_reversa_sdd/sdd/policy-analysis.md#8`. O módulo consome apenas `shared_kernel.contracts` (Fase 0, já implementada) e a fachada `document_processing.public_api` do Dev 1, atrás de uma porta `EvidenceSource` que aceita evidências mockadas (RF-10) — desbloqueando o desenvolvimento em paralelo. A extração usa um agente multi-campo (1 chamada de LLM por apólice, decisão OQ-02) com saída estruturada validada por Pydantic. A comparação é uma função pura determinística em domain, sem LLM (RN-01), com comparadores por tipo de valor. Persistência em DuckDB com schema auto-criado e IDs do shared_kernel. Explicação por LLM com citação obrigatória de evidência dos dois lados e export final em Markdown standalone. Tudo coberto por pytest com fixtures sintéticas, na branch `feature/dev2-policy-analysis`.
 
 ## 2. Princípios aplicados
 
@@ -24,7 +24,7 @@ n/a — `.reversa/principles.md` não existe neste projeto (greenfield). As rest
 | D-05 | Comparador determinístico puro em domain, com comparadores por tipo (numérico, moeda, período, texto) usando `Decimal` para valores monetários | RN-01/RN-06 e tabela híbrida decidida (OQ-03): determinismo total, testável sem LLM | comparação por LLM; float puro (erro de arredondamento) | 🟢 |
 | D-06 | Persistência em DuckDB com schema auto-criado (`CREATE TABLE IF NOT EXISTS`) na primeira execução | RF-05; spec §9 ("schema criado na primeira execução"); sem migração em greenfield | ORM relacional completo; arquivo JSON | 🟡 |
 | D-07 | Explicação gerada por LLM com prompt que exige citação de `evidence_ids` dos dois lados; explicação sem citação resolvível é rejeitada e reexecutada | RF-07/RN-02: rastreabilidade da defesa | explicação livre sem validação; template fixo sem LLM | 🟡 |
-| D-08 | Export em PDF standalone com `fpdf2` (leve, sem dependências nativas) | Decisão OQ-04 (sessão clarify); arquivo que abre sem o sistema (RF-08) | reportlab (mais pesado); weasyprint (dependências de sistema) | 🟡 |
+| D-08 | Export em Markdown standalone (renderizador próprio em `infrastructure/markdown_export.py`) | Decisão OQ-04 **revisada em 2026-09-26** (alinhamento com o fluxo paralelo, `_reversa_forward/001-vertical-slice-e2e/`); arquivo que abre sem o sistema (RF-08) | PDF via fpdf2 (escolha inicial da sessão clarify, substituída); reportlab; weasyprint | 🟢 |
 | D-09 | `ComparisonId` determinístico derivado do par ordenado de `policy_id` (hash estável) | Idempotência EC-06: mesma comparação → mesmo ID, sem duplicar registros | UUIDv4 por execução (quebraria idempotência) | 🟡 |
 | D-10 | Falhas de LLM mapeadas para erro classificado reexecutável + sinalização de revisão; retry com backoff limitado (3 tentativas) | RF-09/EC-01 (`_reversa_sdd/sdd/policy-analysis.md#11`) | fallback de modelo (fora do escopo da spec); falha silenciosa | 🟡 |
 
@@ -82,7 +82,7 @@ n/a — projeto greenfield: o banco é criado do zero na primeira execução (`C
 - [ ] Os 7 cenários Gherkin do `requirements.md` cobertos por testes automatizados
 - [ ] Testes de determinismo: comparação repetida do mesmo par = mesmo `ComparisonId` e mesmo resultado
 - [ ] Suíte `tests/contracts/` (67 testes da Fase 0) continua verde — zero regressão
-- [ ] Export PDF gerado abre standalone e contém todos os 10 campos do catálogo, inclusive ausentes
+- [ ] Export Markdown gerado abre standalone e contém todos os 10 campos do catálogo, inclusive ausentes
 - [ ] `cross-check.md` (se executado) sem CRITICAL nem HIGH
 - [ ] `regression-watch.md` gerado
 

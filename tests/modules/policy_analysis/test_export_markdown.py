@@ -1,4 +1,4 @@
-"""T013 — Export PDF standalone com todos os campos do catálogo (RF-08)."""
+"""T013 — Export Markdown standalone com todos os campos do catálogo (RF-08, OQ-04 revisada)."""
 
 from __future__ import annotations
 
@@ -46,23 +46,23 @@ def build_full_comparison() -> ComparisonResult:
     )
 
 
-def test_export_gera_pdf_standalone_com_os_10_campos(tmp_path):
+def test_export_gera_markdown_standalone_com_os_10_campos(tmp_path):
     repo = PolicyAnalysisRepository(":memory:")
     repo.upsert_comparison(build_full_comparison())
     service = ExportService(repo, output_dir=str(tmp_path))
 
     path = service.export_comparison("CMP-EXPORT-1")
 
-    raw = open(path, "rb").read()
-    assert raw.startswith(b"%PDF")
-    assert len(raw) > 1000
+    assert path.endswith(".md")
+    text = open(path, encoding="utf-8").read()
+    assert text.startswith("#")  # documento standalone, abre em qualquer lugar
+    assert len(text) > 500
 
-    # a stream do PDF escapa parênteses com '\' — removemos para a busca textual
-    text = normalize_text(raw.decode("latin-1").replace("\\", ""))
+    normalized = normalize_text(text)
     for code in all_codes():
-        assert normalize_text(LABELS[code]) in text, f"campo {code} ausente no export"
-    assert "ausente_b" in text  # campo ausente sinalizado, não omitido
-    assert "cmp-export-1" in text  # ComparisonId no documento
+        assert normalize_text(LABELS[code]) in normalized, f"campo {code} ausente no export"
+    assert "ausente_b" in normalized  # campo ausente sinalizado, não omitido
+    assert "cmp-export-1" in normalized  # ComparisonId no documento
 
 
 def test_export_e_idempotente(tmp_path):

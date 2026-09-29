@@ -64,7 +64,7 @@
 | RF-05 | O sistema deve persistir apólices, documentos, fatos e comparações em banco analítico local com os mesmos identificadores do shared_kernel, usando `ProcessingStatus` para coordenar com o workflow. | Must | Fato consultado no banco tem os mesmos IDs dos chunks indexados (0 divergências). | 🟡 |
 | RF-06 | O sistema deve comparar 2 apólices campo a campo por regras determinísticas por tipo de valor: numérico (maior/menor/igual); moeda (normalizada para BRL pela data da apólice); período (comparado por datas e duração); texto livre (igual/divergente após normalização, com explicação detalhando a divergência — semântica fica com o analista); ausente (sinalizado como diferença por omissão); retornando o resultado por campo. | Must | 2 fixtures idênticas = 100% "igual"; execuções repetidas do mesmo par produzem o mesmo resultado (RN-01, RN-06). | 🟢 |
 | RF-07 | O sistema deve gerar, para cada diferença, uma explicação em linguagem de analista que cita a evidência (página/trecho) de ambas as apólices. | Must | Explicação sem evidência citada é rejeitada; citações resolvem para os `evidence_ids` dos fatos comparados. | 🟡 |
-| RF-08 | O sistema deve emitir `ComparisonId` único por comparação e exportar o resumo (por campo: valores, direção da diferença, evidências, explicação) em documento PDF standalone que abre sem o sistema. | Must | O export contém todos os campos do catálogo, inclusive ausentes, e não depende do sistema para ser lido. | 🟢 |
+| RF-08 | O sistema deve emitir `ComparisonId` único por comparação e exportar o resumo (por campo: valores, direção da diferença, evidências, explicação) em documento Markdown standalone que abre sem o sistema. | Must | O export contém todos os campos do catálogo, inclusive ausentes, e não depende do sistema para ser lido. | 🟢 |
 | RF-09 | O sistema deve validar toda saída de LLM contra o schema do contrato antes de aceitar; saída inválida vira falha classificada (reexecutável) e sinalização de revisão, nunca fato. Indisponibilidade do provedor (timeout/erro temporário) segue retentativa com backoff e, persistindo, sinalização de revisão. | Must | Resposta fora do schema nunca é persistida como fato; falha registrada com causa classificada e reexecutável. | 🟡 |
 | RF-10 | O sistema deve operar com evidências de teste (mockadas) e com evidências reais do retrieval, sem mudança de contrato, para permitir desenvolver antes da integração do módulo documental. | Must | Mesma extração roda com as duas fontes; apenas a origem da evidência muda. | 🟡 |
 
@@ -152,7 +152,7 @@ Cenário: Extração consome apenas a fachada pública do módulo documental
 - **Q:** [OQ-03] Qual tabela inicial de regras de comparação por tipo de valor?
   **R:** Híbrida: numérico, moeda e período seguem regra determinística normalizada (moeda para BRL pela data da apólice; período por datas e duração); texto livre compara igual/divergente após normalização e, havendo divergência, a explicação detalha — a semântica fica com o analista.
 - **Q:** [OQ-04] Qual formato do export da defesa da análise?
-  **R:** Documento PDF standalone.
+  **R:** Documento PDF standalone. — **Atualizado (2026-09-26):** decisão revisada para **Markdown standalone**, alinhando com a definição do fluxo paralelo (`_reversa_forward/001-vertical-slice-e2e/`) e fechando a divergência de decisão aberta.
 - **Q:** [OQ-02] Qual estratégia de prompts dos agentes de extração?
   **R:** Agente multi-campo: uma única chamada de LLM por apólice extrai todos os campos do catálogo.
 

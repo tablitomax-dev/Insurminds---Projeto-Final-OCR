@@ -79,7 +79,8 @@ def test_cenario_extração_comparacao_e_export(fixture_a, fixture_b, evidences_
             )
 
     path = facade.export_comparison(result.comparison_id)
-    assert open(path, "rb").read().startswith(b"%PDF")
+    assert path.endswith(".md")
+    assert open(path, encoding="utf-8").read().startswith("#")  # standalone
 
 
 def test_cenario_revisao_humana_de_fato_ambiguo(fixture_a, fixture_b, evidences_a, evidences_b, tmp_path):

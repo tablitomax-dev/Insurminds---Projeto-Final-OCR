@@ -29,3 +29,7 @@
 {"ts":"2026-09-26T17:47:38Z","action":"T029","status":"done","files":["tests/modules/policy_analysis/test_e2e_flow.py"]}
 {"ts":"2026-09-26T17:47:38Z","action":"T030","status":"done","files":["src/modules/policy_analysis/infrastructure/llm_agent.py"]}
 {"ts":"2026-09-26T17:47:38Z","action":"T031","status":"done","files":["src/modules/policy_analysis/application/errors.py"]}
+{"ts":"2026-09-29T23:13:22Z","action":"T013","status":"corrected","note":"export migrado de PDF para Markdown (OQ-04 revisada); test_export_pdf.py -> test_export_markdown.py"}
+{"ts":"2026-09-29T23:13:22Z","action":"T024","status":"corrected","note":"pdf_export.py removido; markdown_export.py criado"}
+{"ts":"2026-09-29T23:13:22Z","action":"T025","status":"corrected","note":"export_comparison gera comparison_<id>.md"}
+{"ts":"2026-09-29T23:13:22Z","action":"T029","status":"corrected","note":"E2E atualizado para export Markdown"}

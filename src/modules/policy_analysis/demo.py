@@ -114,7 +114,7 @@ def main() -> None:
             print(f"- {campo.field_code}: {explanation.text}")
 
     path = facade.export_comparison(result.comparison_id)
-    print(f"\n== Export ==\nPDF standalone: {path}")
+    print(f"\n== Export ==\nMarkdown standalone: {path}")
 
 
 if __name__ == "__main__":
