@@ -1,16 +1,15 @@
 """Golden set sintético (RF-04): 1 execução → relatório dos 20 casos.
 
-A extração roda via fachada do `policy_analysis` com `LlmExtractor` injetado
-(scriptado/determinístico — sem custo de LLM real). O relatório responde por
-campo: campo correto? evidência correta? — e carrega a ressalva R1/R3.
+A extração roda via fachada do `policy_analysis` com agentes determinísticos
+(scriptados — sem custo de LLM real). O relatório responde por campo: campo
+correto? evidência correta? — e carrega a ressalva R1/R3.
 """
 
 from fakes.policy_analysis import (
-    FakeEvidenceRetriever,
-    FakeExplanationGenerator,
-    FakeLlmExtractor,
-    InMemoryFactRepository,
-    ScriptedLlmExtractor,
+    FailingExtractionAgent,
+    FixtureExplanationAgent,
+    MockEvidenceSource,
+    ScriptedExtractionAgent,
     make_evidence,
 )
 from modules.evaluation.public_api import (
@@ -25,13 +24,13 @@ FIELD_CODES = {
     "limite_agregado",
     "limite_por_sinistro",
     "franquia",
-    "vigencia_inicio",
-    "vigencia_fim",
-    "base_territorial",
-    "retroatividade",
-    "prazo_notificacao",
+    "vigencia",
+    "prazo_notificacao_sinistro",
+    "extensao_territorial",
     "exclusoes_chave",
-    "nome_segurado",
+    "limite_defesa_custos",
+    "retroatividade",
+    "indice_reajuste",
 }
 
 
@@ -57,10 +56,9 @@ def _stack(reference, outputs=None, extractor=None):
     if outputs:
         scripted.update(outputs)
     return create_policy_analysis(
-        retriever=FakeEvidenceRetriever(evidences_by_policy=evidences_by_policy),
-        llm_extractor=extractor or ScriptedLlmExtractor(scripted),
-        repository=InMemoryFactRepository(),
-        explanation_generator=FakeExplanationGenerator(),
+        MockEvidenceSource(evidences_by_policy),
+        extractor or ScriptedExtractionAgent(scripted),
+        FixtureExplanationAgent(),
     )
 
 
@@ -102,10 +100,10 @@ def test_caso_divergente_e_sinalizado(tmp_path):
             "value": {"amount": 30000.0, "currency": "BRL", "raw_text": "R$ 25.000,00"},
             "anchor": "Franquia: R$ 25.000,00",
         },
-        ("pol_sint_b", "nome_segurado"): {
+        ("pol_sint_b", "extensao_territorial"): {
             "status": "FOUND",
-            "value": {"text": "Outra Empresa Ltda.", "raw_text": "Bravo Tech Ltda."},
-            "anchor": "Bravo Tech Ltda.",
+            "value": {"text": "Canadá", "raw_text": "Base territorial: Estados Unidos"},
+            "anchor": "Base territorial: Estados Unidos",
         },
     }
 
@@ -116,7 +114,7 @@ def test_caso_divergente_e_sinalizado(tmp_path):
     divergent = [entry for entry in report.entries if entry.result == "divergente"]
     assert {(entry.policy_id, entry.field_code) for entry in divergent} == {
         ("pol_sint_a", "franquia"),
-        ("pol_sint_b", "nome_segurado"),
+        ("pol_sint_b", "extensao_territorial"),
     }
     assert report.totals.divergent == 2
     assert report.totals.correct == 18
@@ -142,7 +140,7 @@ def test_relatorio_eh_deterministico(tmp_path):
 def test_falha_externa_nao_conta_como_erro_de_extracao(tmp_path):
     reference = load_reference_set(GOLDEN_SET_PATH)
     policy = _stack(
-        reference, extractor=FakeLlmExtractor(error=RuntimeError("timeout do provedor"))
+        reference, extractor=FailingExtractionAgent(RuntimeError("timeout do provedor"))
     )
 
     report = create_evaluation(policy, report_dir=tmp_path).run_evaluation(reference)

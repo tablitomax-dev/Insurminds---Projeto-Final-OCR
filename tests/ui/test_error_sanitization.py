@@ -1,12 +1,13 @@
 """T-2a (UI): `st.error` nunca carrega texto de apólice nem exceção crua.
 
 A mensagem é tipada (estágio + tipo + IDs) e só ecoa exceções do projeto,
-cuja mensagem já é construída/sanitizada no módulo.
+cuja mensagem já é construída/sanitizada no módulo: `ClassifiedError` ecoa
+apenas o código estável (nunca `str(exc)`).
 """
 
 from pydantic import BaseModel, ValidationError
 
-from modules.policy_analysis.public_api import LlmOutputError
+from modules.policy_analysis.public_api import ClassifiedError
 from shared_kernel.errors import ContractValidationError
 from ui.errors import sanitize_error_message
 
@@ -43,13 +44,19 @@ def test_validation_error_nunca_ecoa_o_input():
     assert POLICY_TEXT not in message
 
 
-def test_erro_de_llm_ja_sanitizado_e_mantido():
-    error = LlmOutputError("EXTRACT: citação do LLM fora do texto (quantidade=1)")
+def test_erro_classificado_ecoa_apenas_o_codigo_sanitizado():
+    error = ClassifiedError(
+        "LLM_SCHEMA_INVALID",
+        "EXTRACT: citação do LLM fora do texto (quantidade=1)",
+        retriable=True,
+    )
 
     message = sanitize_error_message("EXTRACT", error)
 
-    assert "LlmOutputError" in message
-    assert "citação do LLM fora do texto" in message
+    assert "ClassifiedError" in message
+    assert "LLM_SCHEMA_INVALID" in message
+    # Só o código é ecoado — nunca `str(exc)` (T-2a).
+    assert "citação do LLM fora do texto" not in message
 
 
 def test_erro_de_contrato_e_mantido():

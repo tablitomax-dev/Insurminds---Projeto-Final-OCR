@@ -15,20 +15,99 @@ pytestmark = pytest.mark.integration
 
 def test_duckdb_repository_idempotente(tmp_path):
     pytest.importorskip("duckdb", reason="duckdb não instalado")
-    from fakes.policy_analysis import make_evidence, make_fact
-    from modules.policy_analysis.infrastructure.duckdb_repository import DuckDbFactRepository
+    from modules.policy_analysis.domain.models import ComparisonResult, FieldComparison
+    from modules.policy_analysis.infrastructure.duckdb_repository import (
+        PolicyAnalysisRepository,
+    )
+    from shared_kernel.contracts import ExtractedFact
 
-    repository = DuckDbFactRepository(str(tmp_path / "facts.duckdb"))
-    fact = make_fact("pol_a", "limite_agregado", value={"amount": 1.0}, evidence_ids=["ev_1"])
-    repository.save_evidence(make_evidence("ev_1", policy_id="pol_a"))
-    repository.upsert_fact(fact)
-    repository.upsert_fact(fact)  # idempotente por (policy_id, field_code)
+    repository = PolicyAnalysisRepository(str(tmp_path / "policy_analysis.duckdb"))
+    repository.init_schema()  # schema auto-criado é idempotente
+
+    repository.upsert_policy(
+        {
+            "policy_id": "pol_a",
+            "seguradora": "Acme Seguros",
+            "vigencia_inicio": "2026-01-01",
+            "vigencia_fim": "2026-12-31",
+            "fonte_documentos": "sintética",
+        }
+    )
+    repository.upsert_document(
+        {"document_id": "doc_1", "policy_id": "pol_a", "nome_fonte": "apolice_a.pdf"}
+    )
+    repository.upsert_policy(
+        {
+            "policy_id": "pol_a",
+            "seguradora": "Acme Seguros",
+            "vigencia_inicio": "2026-01-01",
+            "vigencia_fim": "2026-12-31",
+            "fonte_documentos": "sintética",
+        }
+    )  # idempotente por policy_id
+    repository.upsert_document(
+        {"document_id": "doc_1", "policy_id": "pol_a", "nome_fonte": "apolice_a.pdf"}
+    )  # idempotente por document_id
+
+    fact = ExtractedFact(
+        fact_id="FAC-pol_a-limite_agregado",
+        policy_id="pol_a",
+        field_code="limite_agregado",
+        status="FOUND",
+        value={"amount": 900_000.0, "currency": "BRL"},
+        normalized_value={"amount": "900000.00", "currency": "BRL"},
+        confidence=0.9,
+        evidence_ids=["ev_1"],
+        requires_human_review=True,
+    )
+    repository.upsert_fact(fact, run_id="run_1", schema_version="1.0")
+    repository.upsert_fact(fact, run_id="run_1", schema_version="1.0")  # idempotente
 
     facts = repository.get_facts("pol_a")
     assert [item.field_code for item in facts] == ["limite_agregado"]
-    assert repository.get_evidence("ev_1") is not None
-    assert repository.get_fact("pol_a", "limite_agregado") is not None
-    assert repository.get_fact("pol_a", "franquia") is None
+    assert facts[0] == fact
+    assert repository.get_facts("pol_a", "franquia") == []
+
+    # fila de revisão com o fato pendente e registro da decisão humana
+    items = repository.get_review_items("pol_a")
+    assert [item.fact.fact_id for item in items] == ["FAC-pol_a-limite_agregado"]
+    assert items[0].revisao_status == "PENDENTE"
+    repository.record_review(
+        "FAC-pol_a-limite_agregado",
+        "CORRIGIDO",
+        {"decisao": "CORRIGIDO", "value": None},
+        "ana",
+        "2026-09-29T12:00:00Z",
+        requires_human_review=False,
+    )
+    reviewed = repository.get_review_item("FAC-pol_a-limite_agregado")
+    assert reviewed.revisao_status == "CORRIGIDO"
+    assert reviewed.revisao_por == "ana"
+    assert repository.get_review_items("pol_a")[0].revisao_status == "CORRIGIDO"
+
+    # comparação idempotente por comparison_id (DELETE+INSERT em transação)
+    result = ComparisonResult(
+        comparison_id="cmp_1",
+        policy_id_a="pol_a",
+        policy_id_b="pol_b",
+        campos=(
+            FieldComparison(
+                field_code="limite_agregado",
+                resultado="MAIOR",
+                valor_a={"amount": "900000.00", "currency": "BRL"},
+                valor_b=None,
+                direcao="A",
+                evidencias_a=("ev_1",),
+                evidencias_b=(),
+                explicacao="A supera B.",
+            ),
+        ),
+    )
+    repository.upsert_comparison(result)
+    repository.upsert_comparison(result)  # idempotente
+    stored = repository.get_comparison("cmp_1")
+    assert stored == result
+    assert repository.get_comparison("cmp_inexistente") is None
 
 
 def test_pymupdf_extrai_texto_por_pagina(tmp_path):

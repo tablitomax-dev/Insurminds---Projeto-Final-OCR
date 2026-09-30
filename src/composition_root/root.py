@@ -9,13 +9,12 @@ from modules.document_processing.public_api import (
 from modules.policy_analysis.public_api import (
     PolicyAnalysisFacade,
     create_default_policy_analysis,
-    create_document_processing_retriever,
 )
 
 
 def build_facades(
-    db_path: str = "data/facts.duckdb",
-    model_name: str | None = None,
+    db_path: str = "exports/policy_analysis.duckdb",
+    model_name: str = "gemini-2.0-flash",
     api_key: str | None = None,
 ) -> tuple[DocumentProcessingFacade, PolicyAnalysisFacade]:
     """Monta as duas fachadas do pipeline na ordem documental → análise.
@@ -26,8 +25,9 @@ def build_facades(
     """
     document = create_default_document_processing()
     policy = create_default_policy_analysis(
-        retriever=create_document_processing_retriever(document),
+        document_processing_facade=document,
         db_path=db_path,
+        output_dir="exports",
         model_name=model_name,
         api_key=api_key,
     )
