@@ -9,4 +9,6 @@ Política semântica:
 
 from typing import Final
 
-CONTRACTS_VERSION: Final[str] = "1.0.0"
+#: v1.1.0 (MINOR): `ChunkMetadata.content_fingerprint` opcional (caixa postal
+#: `contract-delta-chunkmetadata.md`, feature 005-p1-dev1-proveniencia).
+CONTRACTS_VERSION: Final[str] = "1.1.0"

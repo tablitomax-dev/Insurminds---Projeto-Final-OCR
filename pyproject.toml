@@ -22,3 +22,43 @@ where = ["src"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+markers = [
+    "integration: testes que exigem dependências externas (pulados quando ausentes)",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+cache-dir = ".tmp/ruff_cache"
+# Fora do escopo do gate: ferramentas do Reversa, instalados locais e artefatos.
+extend-exclude = [".tools", ".tmp", "exports", ".claude", ".agents", ".reversa"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.ruff.lint.isort]
+# Convenção do repositório: pacotes do projeto (src/ e tests/fakes) no mesmo bloco.
+known-first-party = ["fakes", "modules", "shared_kernel"]
+
+[tool.ruff.lint.per-file-ignores]
+# Contrato versionado: mudanças em src/shared_kernel só via caixa postal + bump
+# de CONTRACTS_VERSION (aprendizados §5.2). Ordem de imports preservada.
+"src/shared_kernel/**" = ["I001"]
+# Terreno do Dev 1: ordem de imports fica para a manutenção dele (caixa postal).
+"src/modules/document_processing/**" = ["I001"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+cache_dir = ".tmp/mypy_cache"
+
+[[tool.mypy.overrides]]
+# Terreno do Dev 1: pendências de tipagem (service/indexing) registradas para a
+# manutenção dele — o gate não refatora código alheio (remover quando ele corrigir).
+module = [
+    "document_processing",
+    "document_processing.*",
+    "modules.document_processing",
+    "modules.document_processing.*",
+]
+ignore_errors = true

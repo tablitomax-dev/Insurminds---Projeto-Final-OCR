@@ -53,6 +53,7 @@
       "spec-sdd",
       "forward-001",
       "forward-001-dev2-slice"
+      "forward-001"
     ],
     "spec_sdd_components": [
       "shared-kernel-contracts (100/100)",
