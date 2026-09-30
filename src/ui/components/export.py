@@ -26,11 +26,11 @@ def render_export(policy_api: PolicyAnalysisFacade, comparison_id: str) -> None:
     if not st.button("Exportar resumo"):
         return
     try:
-        path = policy_api.export_comparison(comparison_id, export_dir=EXPORT_DIR)
+        path = policy_api.export_comparison(comparison_id)
     except Exception as error:  # noqa: BLE001 — mensagem sanitizada na UI
         st.error(sanitize_error_message("EXPORTACAO", error))
     else:
-        st.success(f"Export gerado: {path}")
+        st.success(f"Export gerado em `{EXPORT_DIR}`: {path}")
         st.download_button(
             "Baixar resumo",
             data=Path(path).read_text(encoding="utf-8"),

@@ -9,11 +9,11 @@ from __future__ import annotations
 
 from modules.policy_analysis.public_api import (
     SEVERITY_ORDER,
-    ExtractedFact,
     Issue,
     Severity,
     UsageSummary,
 )
+from shared_kernel.contracts import ExtractedFact
 
 
 def group_by_severity(

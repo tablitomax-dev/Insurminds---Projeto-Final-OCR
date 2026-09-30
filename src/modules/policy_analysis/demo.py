@@ -61,7 +61,7 @@ def main() -> None:
     if os.environ.get("EVIDENCE_SOURCE") == "document_processing":
         evidence_source = DocumentProcessingEvidenceSource()
     else:
-        evidence_source = MockEvidenceSource(
+        evidence_source = MockEvidenceSource(  # type: ignore[assignment]
             {
                 policy_a: MockEvidenceSource.from_fixture_files(FIXTURES_DIR / "apolice_a.json")
                 .get_evidences(policy_a),
@@ -75,13 +75,13 @@ def main() -> None:
         extraction_agent = MultiFieldExtractionAgent(client)
         explanation_agent = LLMExplanationAgent(client)
     else:
-        extraction_agent = FixtureExtractionAgent(
+        extraction_agent = FixtureExtractionAgent(  # type: ignore[assignment]
             {
                 policy_a: fixtures["a"]["llm_output"],
                 policy_b: fixtures["b"]["llm_output"],
             }
         )
-        explanation_agent = FixtureExplanationAgent({})
+        explanation_agent = FixtureExplanationAgent({})  # type: ignore[assignment]
 
     (REPO_ROOT / "output").mkdir(parents=True, exist_ok=True)
     facade = PolicyAnalysisFacade(
