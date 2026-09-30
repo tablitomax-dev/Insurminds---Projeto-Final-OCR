@@ -8,7 +8,10 @@ from modules.policy_analysis.application.extraction import ExtractionService
 from modules.policy_analysis.application.review import ReviewService
 from modules.policy_analysis.infrastructure.duckdb_repository import PolicyAnalysisRepository
 from modules.policy_analysis.infrastructure.evidence_source import MockEvidenceSource
-from modules.policy_analysis.infrastructure.llm_agent import FixtureExtractionAgent
+from modules.policy_analysis.infrastructure.llm_agent import (
+    FixtureExplanationAgent,
+    FixtureExtractionAgent,
+)
 
 ALL_CODES = [
     "limite_agregado",
@@ -87,3 +90,60 @@ def test_corrigido_sem_valor_e_invalido(fixture_a, evidences_a):
             decision="CORRIGIDO",
             decided_by="analista@insurminds",
         )
+
+
+def test_registrar_divergencia_fica_auditada_sem_pendencia(fixture_a, evidences_a):
+    """D2-P0-2: terceira ação do loop de revisão — 'Registrar divergência'."""
+    repo, extraction, review = build(fixture_a, evidences_a)
+    extraction.extract_fields("POL-A", ALL_CODES)
+
+    updated = review.record_decision(
+        "FAC-POL-A-indice_reajuste",
+        decision="DIVERGENTE",
+        decided_by="analista@insurminds",
+        reason="cláusula 10.2 (4%) contradiz cláusula 10.3 (5%)",
+    )
+    assert updated.status == "NEEDS_REVIEW"  # valor não comparável
+    assert updated.requires_human_review is False  # pendência tratada
+
+    item = repo.get_review_item("FAC-POL-A-indice_reajuste")
+    assert item.revisao_status == "DIVERGENTE"
+    assert item.revisao_decisao["reason"].startswith("cláusula 10.2")
+    assert item.revisao_por == "analista@insurminds"
+    assert review.list_pending("POL-A") == []
+
+
+def test_divergencia_sem_motivo_e_invalida(fixture_a, evidences_a):
+    repo, extraction, review = build(fixture_a, evidences_a)
+    extraction.extract_fields("POL-A", ALL_CODES)
+
+    with pytest.raises(ValueError):
+        review.record_decision(
+            "FAC-POL-A-indice_reajuste",
+            decision="DIVERGENTE",
+            decided_by="analista@insurminds",
+        )
+
+
+def test_comparacao_usa_divergencia_registrada(fixture_a, fixture_b, evidences_a, evidences_b, tmp_path):
+    from modules.policy_analysis.public_api import PolicyAnalysisFacade
+
+    facade = PolicyAnalysisFacade(
+        MockEvidenceSource({"POL-A": evidences_a, "POL-B": evidences_b}),
+        FixtureExtractionAgent({"POL-A": fixture_a["llm_output"], "POL-B": fixture_b["llm_output"]}),
+        FixtureExplanationAgent({}),
+        db_path=":memory:",
+        output_dir=str(tmp_path),
+    )
+    facade.extract_fields("POL-A", ALL_CODES)
+    facade.extract_fields("POL-B", ALL_CODES)
+
+    assert facade.compare_policies("POL-A", "POL-B").campo("indice_reajuste").resultado == "AGUARDANDO_REVISAO"
+
+    facade.record_review_decision(
+        "FAC-POL-A-indice_reajuste",
+        decision="DIVERGENTE",
+        decided_by="analista@insurminds",
+        reason="trechos contraditórios na apólice A",
+    )
+    assert facade.compare_policies("POL-A", "POL-B").campo("indice_reajuste").resultado == "DIVERGENTE"

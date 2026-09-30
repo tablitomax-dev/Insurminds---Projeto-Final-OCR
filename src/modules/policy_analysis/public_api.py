@@ -54,9 +54,14 @@ class PolicyAnalysisFacade:
         return self._review.list_pending(policy_id)
 
     def record_review_decision(
-        self, fact_id: str, decision: str, decided_by: str, value: dict | None = None
+        self,
+        fact_id: str,
+        decision: str,
+        decided_by: str,
+        value: dict | None = None,
+        reason: str | None = None,
     ) -> ExtractedFact:
-        return self._review.record_decision(fact_id, decision, decided_by, value)
+        return self._review.record_decision(fact_id, decision, decided_by, value, reason)
 
     # --- comparação determinística (RF-06) ------------------------------------
 

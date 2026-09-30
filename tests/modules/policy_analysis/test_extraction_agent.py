@@ -161,6 +161,25 @@ def test_resposta_nao_estruturada_e_rejeitada():
     assert exc.value.code == "LLM_SCHEMA_INVALID"
 
 
+def test_falha_de_regra_do_campo_vira_needs_review(evidences_a):
+    """D2-P0-3: valor que passa no LLM mas falha na regra nunca vira FOUND."""
+    raw = [
+        {
+            "field_code": "limite_agregado",
+            "status": "FOUND",
+            "value": {"amount": "-100.00", "currency": "BRL"},
+            "confidence": 0.9,
+            "evidence_ids": ["EV-A-001"],
+            "requires_human_review": False,
+        }
+    ]
+    service = ExtractionService(MockEvidenceSource({"POL-A": evidences_a}), StubAgent(raw), _memory_repo())
+
+    fact = service.extract_field("POL-A", "limite_agregado")
+    assert fact.status == "NEEDS_REVIEW"
+    assert fact.requires_human_review is True
+
+
 def _memory_repo():
     from modules.policy_analysis.infrastructure.duckdb_repository import PolicyAnalysisRepository
 

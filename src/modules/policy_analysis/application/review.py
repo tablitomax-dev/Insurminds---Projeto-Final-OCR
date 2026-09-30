@@ -36,8 +36,9 @@ class ReviewService:
         decision: str,
         decided_by: str,
         value: dict | None = None,
+        reason: str | None = None,
     ) -> ExtractedFact:
-        if decision not in ("CONFIRMADO", "CORRIGIDO"):
+        if decision not in ("CONFIRMADO", "CORRIGIDO", "DIVERGENTE"):
             raise ValueError(f"decisão inválida: {decision!r}")
         item = self._repo.get_review_item(fact_id)
         if item is None:
@@ -51,15 +52,21 @@ class ReviewService:
             new_value = value
             new_normalized = normalize_value(get_field(item.fact.field_code), value)
 
+        # D2-P0-2: "Registrar divergência" (ex.: cláusula contradiz outra) — decisão
+        # auditada com motivo; o fato fica não comparável, sem pendência aberta.
+        new_status = "NEEDS_REVIEW" if decision == "DIVERGENTE" else "FOUND"
+        if decision == "DIVERGENTE" and not reason:
+            raise ValueError("decisão DIVERGENTE exige reason")
+
         self._repo.record_review(
             fact_id,
             decision,
-            {"decisao": decision, "value": value},
+            {"decisao": decision, "value": value, "reason": reason},
             decided_by,
             datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             new_value=new_value,
             new_normalized_value=new_normalized,
-            new_status="FOUND",
+            new_status=new_status,
             requires_human_review=False,
         )
         return self._repo.get_review_item(fact_id).fact

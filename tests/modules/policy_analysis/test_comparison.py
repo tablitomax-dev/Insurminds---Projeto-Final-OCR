@@ -110,6 +110,27 @@ def test_fato_ambiguo_aguarda_revisao():
     assert result.direcao == "n/a"
 
 
+def test_ambiguo_sem_flag_de_revisao_continua_aguardando():
+    field = get_field("indice_reajuste")
+    a = make_fact("indice_reajuste", None, status="AMBIGUOUS", evidence=("EV-10", "EV-11"), review=False)
+    b = make_fact("indice_reajuste", {"number": "4"}, policy_id="POL-B")
+
+    assert compare_facts(field, a, b).resultado == "AGUARDANDO_REVISAO"
+
+
+def test_needs_review_decidido_vira_divergente_nao_comparavel():
+    """D2-P0-2: divergência registrada pelo analista → campo DIVERGENTE, nunca comparado."""
+    field = get_field("limite_agregado")
+    a = make_fact(
+        "limite_agregado", {"amount": "5000000.00", "currency": "BRL"}, status="NEEDS_REVIEW", review=False
+    )
+    b = make_fact("limite_agregado", {"amount": "3000000.00", "currency": "BRL"}, policy_id="POL-B")
+
+    result = compare_facts(field, a, b)
+    assert result.resultado == "DIVERGENTE"
+    assert result.direcao == "n/a"
+
+
 def test_comparacao_e_deterministica_e_idempotente():
     field = get_field("franquia")
     a = make_fact("franquia", {"amount": "50000.00", "currency": "BRL"})

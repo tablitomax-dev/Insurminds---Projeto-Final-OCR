@@ -44,9 +44,13 @@ def _is_absent(fact: ExtractedFact | None) -> bool:
 
 
 def _is_pending(fact: ExtractedFact | None) -> bool:
-    return fact is not None and (
-        fact.requires_human_review or fact.status in ("AMBIGUOUS", "NEEDS_REVIEW")
-    )
+    """Pendente = decisão humana em aberto (sinalização ou ambiguidade)."""
+    return fact is not None and (fact.requires_human_review or fact.status == "AMBIGUOUS")
+
+
+def _is_not_comparable(fact: ExtractedFact | None) -> bool:
+    """`NEEDS_REVIEW` decidido (ex.: divergência registrada) = valor não comparável."""
+    return fact is not None and fact.status == "NEEDS_REVIEW"
 
 
 def _money_in_brl(fact: ExtractedFact, currency_rates: dict[str, Decimal] | None) -> Decimal:
@@ -75,6 +79,11 @@ def compare_facts(
     if _is_pending(fact_a) or _is_pending(fact_b):
         return FieldComparison(
             field.code, RESULT_AGUARDANDO_REVISAO, valor_a, valor_b, "n/a", evidencias_a, evidencias_b
+        )
+
+    if _is_not_comparable(fact_a) or _is_not_comparable(fact_b):
+        return FieldComparison(
+            field.code, RESULT_DIVERGENTE, valor_a, valor_b, "n/a", evidencias_a, evidencias_b
         )
 
     ausente_a = _is_absent(fact_a)

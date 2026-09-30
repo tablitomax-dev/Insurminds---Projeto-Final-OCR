@@ -15,7 +15,9 @@ from pydantic import ValidationError
 from shared_kernel.contracts import ExtractedFact, ExtractionRequest
 
 from ..domain.field_catalog import UnknownFieldCodeError, get_field
+from ..domain.rules import validate_field_rules
 from ..domain.value_types import NormalizationError, normalize_value
+from .anchoring import is_anchored
 from .errors import ClassifiedError
 
 SCHEMA_VERSION = "1.0"
@@ -99,12 +101,23 @@ class ExtractionService:
         normalized_value = None
 
         if status == "FOUND" and value is not None:
+            field = get_field(req.field_code)
             try:
-                normalized_value = normalize_value(get_field(req.field_code), value)
+                normalized_value = normalize_value(field, value)
             except NormalizationError:
                 # EC-04: valor não normalizável → NEEDS_REVIEW, não erro.
                 status = "NEEDS_REVIEW"
                 requires_review = True
+            else:
+                # D2-P0-1 (A-07): citação sem ancoragem no texto da evidência nunca vira FOUND.
+                quote = value.get("raw_text") if isinstance(value, dict) else None
+                if quote is not None and not is_anchored(quote, req.evidences):
+                    status = "NEEDS_REVIEW"
+                    requires_review = True
+                # D2-P0-3 (A-08): falha de regra do campo → NEEDS_REVIEW, nunca FOUND.
+                elif validate_field_rules(field, normalized_value):
+                    status = "NEEDS_REVIEW"
+                    requires_review = True
 
         try:
             return ExtractedFact.model_validate(
