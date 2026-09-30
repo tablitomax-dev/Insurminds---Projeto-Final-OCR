@@ -76,8 +76,16 @@ class UsageMetricsCollector:
         cost_usd: float | None,
         run_id: str | None = None,
     ) -> UsageRecord:
-        """Registra uma chamada — no run corrente quando `run_id` é omitido."""
+        """Registra uma chamada — no run corrente quando `run_id` é omitido.
+
+        `run_id` externo (gerado por quem chama, ex. o `ExtractionService` do
+        Dev 2) é aceito e cria o run em memória — sem isso, `record` quebraria
+        com `KeyError` na primeira chamada instrumentada.
+        """
         target = run_id or self._current_run_id or self.begin_run(kind)
+        if target not in self._records:
+            self._records[target] = []
+            self._order.append(target)
         record = UsageRecord(
             run_id=target,
             kind=kind,

@@ -73,11 +73,13 @@ class EvaluationService:
         extracted_scalar = fact.normalized_value or self._policy.normalize_field_value(
             expected.field_code, fact.value
         )
-        source_texts: list[str] = []
-        for evidence_id in fact.evidence_ids:
-            evidence = self._policy.get_evidence(evidence_id)
-            if evidence is not None:
-                source_texts.append(evidence.quoted_text)
+        # A evidência citada pelo fato (nova superfície: lista por apólice/campo).
+        cited_ids = set(fact.evidence_ids)
+        source_texts = [
+            evidence.quoted_text
+            for evidence in self._policy.get_evidences(case.policy_id, expected.field_code)
+            if evidence.evidence_id in cited_ids
+        ]
         result, detail = classify_entry(
             expected.status, fact.status, expected_scalar, extracted_scalar
         )

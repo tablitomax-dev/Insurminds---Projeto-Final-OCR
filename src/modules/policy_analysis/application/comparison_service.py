@@ -10,7 +10,8 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from ..domain.comparison import comparison_id as make_comparison_id, compare_facts
+from ..domain.comparison import compare_facts
+from ..domain.comparison import comparison_id as make_comparison_id
 from ..domain.field_catalog import all_codes, get_field
 from ..domain.models import ComparisonResult
 

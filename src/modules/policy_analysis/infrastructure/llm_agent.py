@@ -11,15 +11,17 @@ provedor real (Gemini via Pydantic AI).
 from __future__ import annotations
 
 import json
+import logging
 import os
-import re
 import time
 from typing import Any, Protocol
 
 from shared_kernel.contracts import ExtractionRequest
 
 from ..application.errors import ClassifiedError
+from ..domain.metrics import KIND_EXPLAIN, KIND_EXTRACT, UsageMetricsCollector
 from ..domain.models import FieldComparison
+from .pricing import compute_cost_usd
 
 
 class LLMClient(Protocol):
@@ -48,8 +50,12 @@ def _with_retries(fn, attempts: int, backoff: float):
             last_exc = exc
             if attempt < attempts and backoff > 0:
                 time.sleep(backoff * (2 ** (attempt - 1)))
+    # T-2a: só o tipo da exceção — a mensagem do provedor pode ecoar texto de
+    # apólice e nunca deve vazar em métrica, log ou erro.
     raise ClassifiedError(
-        "LLM_UNAVAILABLE", f"provedor de LLM indisponível após {attempts} tentativas: {last_exc}", retriable=True
+        "LLM_UNAVAILABLE",
+        f"provedor de LLM indisponível após {attempts} tentativas ({type(last_exc).__name__})",
+        retriable=True,
     )
 
 
@@ -66,18 +72,83 @@ def _parse_structured(raw: Any, expected: type) -> Any:
     return raw
 
 
+def _record_usage(
+    collector: UsageMetricsCollector | None,
+    client: Any,
+    run_id: str,
+    kind: str,
+    started: float,
+) -> None:
+    """Métricas da chamada de LLM (features 003/004): só números/IDs (T-2a).
+
+    Extensão aditiva sobre os agentes do Dev 2: quando um `UsageMetricsCollector`
+    é injetado, cada chamada vira um `UsageRecord` (tokens, latência, custo USD).
+    """
+    if collector is None:
+        return
+    request_tokens = 0
+    response_tokens = 0
+    registros = getattr(client, "usage", None) or []
+    if registros:
+        tokens = registros[-1].get("tokens")
+        if isinstance(tokens, dict):
+            request_tokens = int(tokens.get("request_tokens") or tokens.get("prompt_tokens") or 0)
+            response_tokens = int(
+                tokens.get("response_tokens") or tokens.get("completion_tokens") or 0
+            )
+        elif isinstance(tokens, int):
+            response_tokens = int(tokens)
+    model_name = getattr(client, "_model_name", None) or "llm"
+    cost_usd = compute_cost_usd(model_name, request_tokens, response_tokens)
+    latency_ms = int((time.monotonic() - started) * 1000)
+    collector.record(
+        kind=kind,
+        model_name=model_name,
+        request_tokens=request_tokens,
+        response_tokens=response_tokens,
+        latency_ms=latency_ms,
+        cost_usd=cost_usd,
+        run_id=run_id,
+    )
+    # Log estruturado durável (004): só números, modelo e IDs — nunca texto
+    # de apólice (T-2a).
+    logging.getLogger("policy_analysis.usage").info(
+        json.dumps(
+            {
+                "run_id": run_id,
+                "kind": kind,
+                "model_name": model_name,
+                "request_tokens": request_tokens,
+                "response_tokens": response_tokens,
+                "latency_ms": latency_ms,
+                "cost_usd": cost_usd,
+            },
+            sort_keys=True,
+        )
+    )
+
+
 class MultiFieldExtractionAgent:
     """Agente multi-campo: 1 chamada de LLM por apólice (OQ-02)."""
 
-    def __init__(self, client: LLMClient, retries: int = 3, backoff: float = 1.0):
+    def __init__(
+        self,
+        client: LLMClient,
+        retries: int = 3,
+        backoff: float = 1.0,
+        usage_collector: UsageMetricsCollector | None = None,
+    ):
         self._client = client
         self._retries = retries
         self._backoff = backoff
+        self._usage_collector = usage_collector
         self.usage: list[dict] = []
 
     def extract(self, requests: list[ExtractionRequest], run_id: str) -> list[dict]:
         prompt = build_extraction_prompt(requests)
+        started = time.monotonic()
         raw = _with_retries(lambda: self._client.complete_json(prompt), self._retries, self._backoff)
+        _record_usage(self._usage_collector, self._client, run_id, KIND_EXTRACT, started)
         self.usage.append({"run_id": run_id, "operation": "extract", "prompt_chars": len(prompt)})
         if isinstance(raw, dict):
             raw = raw.get("facts", raw)
@@ -91,15 +162,24 @@ class MultiFieldExtractionAgent:
 class LLMExplanationAgent:
     """Explicação por LLM; a validação da citação fica no caso de uso."""
 
-    def __init__(self, client: LLMClient, retries: int = 3, backoff: float = 1.0):
+    def __init__(
+        self,
+        client: LLMClient,
+        retries: int = 3,
+        backoff: float = 1.0,
+        usage_collector: UsageMetricsCollector | None = None,
+    ):
         self._client = client
         self._retries = retries
         self._backoff = backoff
+        self._usage_collector = usage_collector
         self.usage: list[dict] = []
 
     def explain(self, campo: FieldComparison, run_id: str) -> dict:
         prompt = build_explanation_prompt(campo)
+        started = time.monotonic()
         raw = _with_retries(lambda: self._client.complete_json(prompt), self._retries, self._backoff)
+        _record_usage(self._usage_collector, self._client, run_id, KIND_EXPLAIN, started)
         self.usage.append({"run_id": run_id, "operation": "explain", "prompt_chars": len(prompt)})
         parsed = _parse_structured(raw, dict)
         return {"text": parsed.get("text"), "evidence_ids": parsed.get("evidence_ids")}
@@ -151,9 +231,9 @@ class PydanticAIClient:
         try:
             from pydantic_ai import Agent
             try:
-                from pydantic_ai.models.google import GeminiModel
+                from pydantic_ai.models.google import GeminiModel  # type: ignore[attr-defined]
             except ImportError:  # versões antigas do pydantic-ai
-                from pydantic_ai.models.gemini import GeminiModel
+                from pydantic_ai.models.gemini import GeminiModel  # type: ignore[no-redef]
         except ImportError as exc:
             raise ClassifiedError(
                 "LLM_CLIENT_UNAVAILABLE", f"pydantic-ai indisponível: {exc}", retriable=False
@@ -168,7 +248,7 @@ class PydanticAIClient:
         try:
             agent = Agent(model, output_type=dict)
         except TypeError:  # versões antigas do pydantic-ai
-            agent = Agent(model, result_type=dict)
+            agent = Agent(model, result_type=dict)  # type: ignore[call-overload]
         result = agent.run_sync(prompt)
         output = getattr(result, "output", None)
         if output is None:
@@ -177,7 +257,7 @@ class PydanticAIClient:
         tokens = None
         try:
             usage = result.usage()
-            tokens = getattr(usage, "total_tokens", None) or dict(usage)
+            tokens = getattr(usage, "total_tokens", None) or dict(vars(usage))
         except Exception:
             pass
         self.usage.append({"model": self._model_name, "tokens": tokens, "prompt_chars": len(prompt)})

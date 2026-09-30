@@ -16,7 +16,6 @@ from __future__ import annotations
 from shared_kernel.contracts import ExtractedFact
 
 from ..domain.quality import SEVERITY_ORDER, Issue, QualityReport, Severity
-from .ports import FactRepository
 
 #: Mesma chave gravada por `application/extraction._demote` (manter em sincronia).
 RULE_VIOLATIONS_KEY = "rule_violations"
@@ -46,7 +45,10 @@ class QualitySignalLog:
 class QualityService:
     """Deriva `Issue`s de uma apólice e agrega `QualityReport` (RF-01)."""
 
-    def __init__(self, repository: FactRepository, signals: QualitySignalLog) -> None:
+    def __init__(self, repository, signals: QualitySignalLog) -> None:
+        # `repository` é duck-typed: basta `get_facts(policy_id)` (o
+        # `PolicyAnalysisRepository` do Dev 2 atende; evidências ficam no
+        # `EvidenceSource`, não no repo — ver `_first_evidence`).
         self._repository = repository
         self._signals = signals
 
@@ -134,8 +136,13 @@ class QualityService:
         return issues
 
     def _first_evidence(self, fact: ExtractedFact):
+        # Repo do Dev 2 (`PolicyAnalysisRepository`) não persiste `EvidenceRef`
+        # (evidências vivem no `EvidenceSource`); `evidence_ref` fica `None` aí.
+        lookup = getattr(self._repository, "get_evidence", None)
+        if lookup is None:
+            return None
         for evidence_id in fact.evidence_ids:
-            evidence = self._repository.get_evidence(evidence_id)
+            evidence = lookup(evidence_id)
             if evidence is not None:
                 return evidence
         return None

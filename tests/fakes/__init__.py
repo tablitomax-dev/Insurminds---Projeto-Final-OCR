@@ -8,26 +8,28 @@ from .document_processing import (
     RecordingStatusSink,
 )
 from .policy_analysis import (
-    FakeEvidenceRetriever,
-    FakeExplanationGenerator,
-    FakeLlmExtractor,
+    FailingExtractionAgent,
+    FixtureExplanationAgent,
+    FixtureExtractionAgent,
     InMemoryFactRepository,
-    ScriptedLlmExtractor,
+    MockEvidenceSource,
+    ScriptedExtractionAgent,
     make_evidence,
     make_fact,
 )
 
 __all__ = [
+    "FailingExtractionAgent",
     "FakeEmbedder",
-    "FakeEvidenceRetriever",
-    "FakeExplanationGenerator",
-    "FakeLlmExtractor",
     "FakeOcrEngine",
     "FakeTextExtractor",
+    "FixtureExplanationAgent",
+    "FixtureExtractionAgent",
     "InMemoryFactRepository",
     "InMemoryVectorIndex",
+    "MockEvidenceSource",
     "RecordingStatusSink",
-    "ScriptedLlmExtractor",
+    "ScriptedExtractionAgent",
     "make_evidence",
     "make_fact",
 ]

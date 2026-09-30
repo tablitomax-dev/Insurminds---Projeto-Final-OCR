@@ -28,14 +28,15 @@ def render_comparison(
             st.table(
                 [
                     {
-                        "campo": row.field_code,
-                        "direção": row.direction,
-                        "valor A": row.value_a,
-                        "valor B": row.value_b,
-                        "evidências A": ", ".join(row.evidence_ids_a),
-                        "evidências B": ", ".join(row.evidence_ids_b),
+                        "campo": campo.field_code,
+                        "resultado": campo.resultado,
+                        "direção": campo.direcao,
+                        "valor A": campo.valor_a,
+                        "valor B": campo.valor_b,
+                        "evidências A": ", ".join(campo.evidencias_a),
+                        "evidências B": ", ".join(campo.evidencias_b),
                     }
-                    for row in comparison.rows
+                    for campo in comparison.campos
                 ]
             )
 
@@ -49,10 +50,10 @@ def render_comparison(
     )
     if st.button("Gerar explicação"):
         try:
-            text, cited = policy_api.explain_difference(comparison_id, explain_field)
+            explanation = policy_api.explain_difference(comparison_id, explain_field)
         except Exception as error:  # noqa: BLE001 — mensagem sanitizada na UI
             st.error(sanitize_error_message(f"EXPLICACAO/{explain_field}", error))
         else:
-            st.write(text)
-            st.caption(f"evidências citadas: {', '.join(cited)}")
+            st.write(explanation.text)
+            st.caption(f"evidências citadas: {', '.join(explanation.evidence_ids)}")
     return comparison_id
