@@ -165,15 +165,10 @@ class PydanticAIClient:
             )
 
         model = GeminiModel(self._model_name, api_key=self._api_key)
-        # D2-P0-1: temperature 0.0 em extração e explicação (determinismo).
-        settings = {"temperature": 0.0}
         try:
-            agent = Agent(model, output_type=dict, model_settings=settings)
+            agent = Agent(model, output_type=dict)
         except TypeError:  # versões antigas do pydantic-ai
-            try:
-                agent = Agent(model, result_type=dict, model_settings=settings)
-            except TypeError:
-                agent = Agent(model, result_type=dict)
+            agent = Agent(model, result_type=dict)
         result = agent.run_sync(prompt)
         output = getattr(result, "output", None)
         if output is None:

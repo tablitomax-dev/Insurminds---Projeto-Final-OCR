@@ -1,0 +1,184 @@
+{
+  "reference_version": "golden-v1-sintetico",
+  "oq_02": "substring (ancoragem literal)",
+  "cases": [
+    {
+      "case_id": "golden_a",
+      "policy_id": "pol_sint_a",
+      "chunks": [
+        {
+          "chunk_id": "c1",
+          "page_number": 1,
+          "text": "APÓLICE D&O — Acme Participações S.A. Limite Agregado: R$ 2.000.000,00 por período de vigência. Limite por Sinistro: R$ 1.000.000,00."
+        },
+        {
+          "chunk_id": "c2",
+          "page_number": 2,
+          "text": "Franquia: R$ 25.000,00 por sinistro. Vigência: de 01/01/2025 a 31/12/2025. Retroatividade: 01/01/2020."
+        },
+        {
+          "chunk_id": "c3",
+          "page_number": 3,
+          "text": "Base territorial: Mundo. Prazo de notificação: 30 dias após o conhecimento do sinistro. Exclusões: fraude, dolo e atos ilícitos praticados por qualquer segurado."
+        }
+      ],
+      "expected_facts": [
+        {
+          "field_code": "limite_agregado",
+          "status": "FOUND",
+          "expected_value": {"amount": 2000000.0, "currency": "BRL", "raw_text": "R$ 2.000.000,00"},
+          "evidence_quote": "Limite Agregado: R$ 2.000.000,00"
+        },
+        {
+          "field_code": "limite_por_sinistro",
+          "status": "FOUND",
+          "expected_value": {"amount": 1000000.0, "currency": "BRL", "raw_text": "R$ 1.000.000,00"},
+          "evidence_quote": "Limite por Sinistro: R$ 1.000.000,00"
+        },
+        {
+          "field_code": "franquia",
+          "status": "FOUND",
+          "expected_value": {"amount": 25000.0, "currency": "BRL", "raw_text": "R$ 25.000,00"},
+          "evidence_quote": "Franquia: R$ 25.000,00"
+        },
+        {
+          "field_code": "vigencia_inicio",
+          "status": "FOUND",
+          "expected_value": {"date": "01/01/2025", "raw_text": "01/01/2025"},
+          "evidence_quote": "Vigência: de 01/01/2025 a 31/12/2025"
+        },
+        {
+          "field_code": "vigencia_fim",
+          "status": "FOUND",
+          "expected_value": {"date": "31/12/2025", "raw_text": "31/12/2025"},
+          "evidence_quote": "Vigência: de 01/01/2025 a 31/12/2025"
+        },
+        {
+          "field_code": "base_territorial",
+          "status": "FOUND",
+          "expected_value": {"text": "Mundo", "raw_text": "Base territorial: Mundo"},
+          "evidence_quote": "Base territorial: Mundo"
+        },
+        {
+          "field_code": "retroatividade",
+          "status": "FOUND",
+          "expected_value": {"date": "01/01/2020", "raw_text": "01/01/2020"},
+          "evidence_quote": "Retroatividade: 01/01/2020"
+        },
+        {
+          "field_code": "prazo_notificacao",
+          "status": "FOUND",
+          "expected_value": {
+            "text": "30 dias após o conhecimento do sinistro",
+            "raw_text": "30 dias após o conhecimento do sinistro"
+          },
+          "evidence_quote": "Prazo de notificação: 30 dias após o conhecimento do sinistro"
+        },
+        {
+          "field_code": "exclusoes_chave",
+          "status": "FOUND",
+          "expected_value": {
+            "text": "fraude, dolo e atos ilícitos",
+            "raw_text": "fraude, dolo e atos ilícitos"
+          },
+          "evidence_quote": "Exclusões: fraude, dolo e atos ilícitos"
+        },
+        {
+          "field_code": "nome_segurado",
+          "status": "FOUND",
+          "expected_value": {"text": "Acme Participações S.A.", "raw_text": "Acme Participações S.A."},
+          "evidence_quote": "Acme Participações S.A."
+        }
+      ]
+    },
+    {
+      "case_id": "golden_b",
+      "policy_id": "pol_sint_b",
+      "chunks": [
+        {
+          "chunk_id": "c1",
+          "page_number": 1,
+          "text": "APÓLICE D&O — Bravo Tech Ltda. Limite Agregado: US$ 5.000.000,00 por período de vigência. Limite por Sinistro: US$ 2.500.000,00."
+        },
+        {
+          "chunk_id": "c2",
+          "page_number": 2,
+          "text": "Franquia: US$ 50.000,00 por sinistro. Vigência: de 01/07/2024 a 30/06/2025. Retroatividade: 01/07/2019."
+        },
+        {
+          "chunk_id": "c3",
+          "page_number": 3,
+          "text": "Base territorial: Estados Unidos. Prazo de notificação: 60 dias após o conhecimento do sinistro. Exclusões: multas administrativas e penalidades pecuniárias."
+        }
+      ],
+      "expected_facts": [
+        {
+          "field_code": "limite_agregado",
+          "status": "FOUND",
+          "expected_value": {"amount": 5000000.0, "currency": "USD", "raw_text": "US$ 5.000.000,00"},
+          "evidence_quote": "Limite Agregado: US$ 5.000.000,00"
+        },
+        {
+          "field_code": "limite_por_sinistro",
+          "status": "FOUND",
+          "expected_value": {"amount": 2500000.0, "currency": "USD", "raw_text": "US$ 2.500.000,00"},
+          "evidence_quote": "Limite por Sinistro: US$ 2.500.000,00"
+        },
+        {
+          "field_code": "franquia",
+          "status": "FOUND",
+          "expected_value": {"amount": 50000.0, "currency": "USD", "raw_text": "US$ 50.000,00"},
+          "evidence_quote": "Franquia: US$ 50.000,00"
+        },
+        {
+          "field_code": "vigencia_inicio",
+          "status": "FOUND",
+          "expected_value": {"date": "01/07/2024", "raw_text": "01/07/2024"},
+          "evidence_quote": "Vigência: de 01/07/2024 a 30/06/2025"
+        },
+        {
+          "field_code": "vigencia_fim",
+          "status": "FOUND",
+          "expected_value": {"date": "30/06/2025", "raw_text": "30/06/2025"},
+          "evidence_quote": "Vigência: de 01/07/2024 a 30/06/2025"
+        },
+        {
+          "field_code": "base_territorial",
+          "status": "FOUND",
+          "expected_value": {"text": "Estados Unidos", "raw_text": "Base territorial: Estados Unidos"},
+          "evidence_quote": "Base territorial: Estados Unidos"
+        },
+        {
+          "field_code": "retroatividade",
+          "status": "FOUND",
+          "expected_value": {"date": "01/07/2019", "raw_text": "01/07/2019"},
+          "evidence_quote": "Retroatividade: 01/07/2019"
+        },
+        {
+          "field_code": "prazo_notificacao",
+          "status": "FOUND",
+          "expected_value": {
+            "text": "60 dias após o conhecimento do sinistro",
+            "raw_text": "60 dias após o conhecimento do sinistro"
+          },
+          "evidence_quote": "Prazo de notificação: 60 dias após o conhecimento do sinistro"
+        },
+        {
+          "field_code": "exclusoes_chave",
+          "status": "FOUND",
+          "expected_value": {
+            "text": "multas administrativas e penalidades pecuniárias",
+            "raw_text": "multas administrativas e penalidades pecuniárias"
+          },
+          "evidence_quote": "Exclusões: multas administrativas e penalidades pecuniárias"
+        },
+        {
+          "field_code": "nome_segurado",
+          "status": "FOUND",
+          "expected_value": {"text": "Bravo Tech Ltda.", "raw_text": "Bravo Tech Ltda."},
+          "evidence_quote": "Bravo Tech Ltda."
+        }
+      ]
+    }
+  ]
+}

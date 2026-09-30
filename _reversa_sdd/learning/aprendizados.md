@@ -78,6 +78,13 @@ Cada item registra **o que aconteceu**, a **causa raiz** e a **regra resultante*
 3. **Gate local de qualidade (T-1):** comando único (`ruff` + `mypy` + `python -B -m pytest -q -p no:cacheprovider`) obrigatório antes de todo PR; dono do comando: Dev 2; execução: ambos. GitHub Actions = fora desta rodada.
 4. **Marco de PR:** checar estado remoto (`gh pr list --state all`) antes de criar PR; feature concluída → `regression-watch.md` → `/reversa-sync` (plano B: adendo manual em markdown).
 5. **Registro de decisões:** escolha/descartadas/porquê em `_reversa_forward/<feature>/` (A-10).
+6. **Registro obrigatório em commits e PRs — REGRA PERPÉTUA** (decidida pelo humano em 2026-09-27): todo commit e todo PR preenchem obrigatoriamente os comentários (corpo da mensagem / descrição do PR) com:
+   a. histórico detalhado de todas as alterações implementadas;
+   b. lista exata de arquivos e trechos de código modificados;
+   c. funcionalidades adicionadas ou corrigidas;
+   d. passos sequenciais que outro desenvolvedor deve seguir para evitar conflitos de merge ao trabalhar nas mesmas seções de código;
+   e. quando as alterações interferem em trechos de código compartilhados com outro desenvolvedor: relatório completo de todas as ações executadas nesses trechos compartilhados.
+   Objetivo: evitar divergências de código, manter histórico versionado e acessível a todos, e garantir que o assistente de IA dos outros desenvolvedores interprete corretamente as modificações. Vale para todos os colaboradores e assistentes, sem exceção e sem data de término.
 
 ## 6. Rastreabilidade: aprendizado → ação
 
@@ -116,3 +123,4 @@ Cada item registra **o que aconteceu**, a **causa raiz** e a **regra resultante*
 |------|--------|-------------|
 | 2026-09-26 | v0 | Redação inicial (orquestrador) |
 | 2026-09-26 | v1.0 | Debate multiagente (3 críticos × 2 rodadas): F-04..F-11 → Apêndice A; F-13 → benchmark §4; novas lições F-14/F-15/F-16/A-16; A-02 e A-13 com ressalvas 🟡; convenções de coordenação (§5); rastreabilidade com donos `D1-`/`D2-`/`T-` |
+| 2026-09-27 | v1.1 | Convenção §5.6 (regra perpétua, decisão do humano pbena): registro obrigatório e detalhado em todo commit e PR — histórico de alterações, arquivos/trechos modificados, funcionalidades, passos anti-conflito de merge e relatório de áreas compartilhadas |

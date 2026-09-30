@@ -26,7 +26,9 @@ SEMVER_PATTERN = re.compile(r"^\d+\.\d+\.\d+$")
 
 def test_contracts_version_is_semver():
     assert SEMVER_PATTERN.match(shared_kernel.CONTRACTS_VERSION)
-    assert shared_kernel.CONTRACTS_VERSION == "1.0.0"
+    # Versão vigente do contrato: 1.1.0 (MINOR por `content_fingerprint`
+    # opcional — caixa postal `contract-delta-chunkmetadata.md`, feature 005).
+    assert shared_kernel.CONTRACTS_VERSION == "1.1.0"
 
 
 def test_package_exposes_contracts_surface():
