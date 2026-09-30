@@ -37,11 +37,22 @@
         "regression-watch.md"
       ]
     },
+    "forward_progress_dev2": {
+      "feature": "001-dev2-policy-analysis-slice",
+      "feature-dir": "_reversa_forward/001-dev2-policy-analysis-slice",
+      "stage": "done",
+      "actions": "31/31 concluídas",
+      "tests": "120 passed (67 contratos da Fase 0 + 53 novos)",
+      "branch": "feature/dev2-policy-analysis-slice",
+      "note": "implementação paralela do núcleo policy_analysis (Dev 2); planejamento complementar em _reversa_sdd/learning/plano-acao-dev2.md"
+    },
     "completed_stages": [
       "ideator",
       "researcher",
       "drafter",
       "spec-sdd",
+      "forward-001",
+      "forward-001-dev2-slice"
       "forward-001"
     ],
     "spec_sdd_components": [

@@ -1,3 +1,8 @@
+"""policy_analysis — núcleo de análise de apólices (Dev 2).
+
+Camadas: `domain`, `application`, `infrastructure`; entrada única por
+`public_api.PolicyAnalysisFacade` (spec `_reversa_sdd/sdd/policy-analysis.md#8`).
+"""
 """Módulo de análise de apólices (spec policy-analysis).
 
 Superfície pública única: `PolicyAnalysisFacade` e as fábricas de wiring.

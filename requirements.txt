@@ -1,6 +1,9 @@
 # Núcleo (testes e contratos rodam só com isto)
 pydantic>=2,<3
 pytest>=8
+# Dependências do módulo policy_analysis (feature 001-dev2-policy-analysis-slice)
+pydantic-ai>=0.2
+duckdb>=1.0
 
 # Extras de integração/jornada real (descomente conforme o ambiente):
 # pymupdf>=1.24          # texto nativo (PDF)
