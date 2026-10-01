@@ -132,6 +132,40 @@ def normalize_text_value(raw: dict) -> dict:
     return {"text": normalize_text(str(raw.get("text", "")))}
 
 
+# --- valor digitado pelo analista --------------------------------------------
+
+_DATE_TOKEN = re.compile(r"\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4}|\d{2}-\d{2}-\d{4}")
+
+
+def raw_value_from_text(field, text: str, *, original: dict | None = None) -> dict:
+    """Converte o texto digitado no `value` bruto do tipo do campo.
+
+    A UI envia apenas texto; a regra de tipo mora aqui (nunca na UI).
+    `original` preserva metadado do valor anterior (moeda, unidade).
+    """
+    from .field_catalog import FieldType
+
+    if not isinstance(text, str) or not text.strip():
+        raise NormalizationError(f"valor corrigido vazio: {text!r}")
+    original = original or {}
+    if field.field_type is FieldType.TEXT:
+        return {"text": text}
+    if field.field_type is FieldType.NUMBER:
+        raw = {"number": text}
+        if "unit" in original:
+            raw["unit"] = original["unit"]
+        return raw
+    if field.field_type is FieldType.MONEY:
+        return {"amount": text, "currency": str(original.get("currency", "BRL"))}
+    if field.field_type is FieldType.DATE:
+        return {"date": text}
+    # PERIOD: as duas datas (início e fim) no mesmo texto
+    tokens = _DATE_TOKEN.findall(text)
+    if len(tokens) != 2:
+        raise NormalizationError(f"período precisa de 2 datas (início e fim): {text!r}")
+    return {"start": tokens[0], "end": tokens[1]}
+
+
 # --- chaves comparáveis (determinísticas) ------------------------------------
 
 

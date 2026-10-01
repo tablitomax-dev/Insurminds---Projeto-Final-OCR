@@ -37,6 +37,20 @@ def _render_evidence(
         )
 
 
+def _render_history(policy_api: PolicyAnalysisFacade) -> None:
+    """Histórico de revisões já decididas (RF-04)."""
+    decisions = policy_api.list_review_decisions()
+    if not decisions:
+        return
+    with st.expander(f"Histórico de decisões ({len(decisions)})"):
+        for item in decisions:
+            st.caption(
+                f"{item.fact.policy_id} · {item.fact.field_code} · {item.revisao_status} "
+                f"· revisor: {item.revisao_por or 'n/a'} · {item.revisao_em or 'n/a'} "
+                f"· valor: {item.fact.value}"
+            )
+
+
 def render_review(policy_api: PolicyAnalysisFacade) -> None:
     """Fila de revisão agrupada por severidade + ações Confirmar/Corrigir/Divergência (RF-04)."""
     st.header("4. Revisão humana (Confirmar / Corrigir valor / Registrar divergência)")
@@ -48,66 +62,51 @@ def render_review(policy_api: PolicyAnalysisFacade) -> None:
     queue: list[ReviewItem] = policy_api.list_review_queue()
     if not queue:
         st.write("Nenhuma sinalização pendente.")
-    else:
-        issues: list[Issue] = []
-        for policy_id in sorted({item.fact.policy_id for item in queue}):
-            issues.extend(policy_api.list_issues(policy_id))
-        items_by_fact_id = {item.fact.fact_id: item for item in queue}
-        for severity, facts in group_by_severity([item.fact for item in queue], issues):
-            st.subheader(f"Severidade {severity.value}")
-            for fact in facts:
-                item = items_by_fact_id[fact.fact_id]
-                st.warning(
-                    f"{fact.policy_id} · {fact.field_code} · {fact.status} "
-                    f"(evidências: {', '.join(fact.evidence_ids) or 'n/a'})"
-                )
-                st.caption(f"valor atual: {fact.value} · revisão: {item.revisao_status}")
-                _render_evidence(policy_api, fact.policy_id, fact.field_code)
-                corrected = st.text_input("Valor corrigido", key=f"fix_{fact.fact_id}")
-                col_confirm, col_correct, col_diverge = st.columns(3)
-                with col_confirm:
-                    if st.button("Confirmar", key=f"confirm_{fact.fact_id}"):
-                        _review_action(
-                            "CONFIRMADO",
-                            policy_api.record_review_decision,
-                            fact.fact_id,
-                            "CONFIRMADO",
-                            reviewer,
-                        )
-                with col_correct:
-                    if st.button("Corrigir valor", key=f"correct_{fact.fact_id}"):
-                        _review_action(
-                            "CORRIGIDO",
-                            policy_api.record_review_decision,
-                            fact.fact_id,
-                            "CORRIGIDO",
-                            reviewer,
-                            {"text": corrected},
-                        )
-                with col_diverge:
-                    if st.button("Registrar divergência", key=f"diverge_{fact.fact_id}"):
-                        _review_action(
-                            "DIVERGENTE",
-                            policy_api.record_review_decision,
-                            fact.fact_id,
-                            "DIVERGENTE",
-                            reviewer,
-                        )
-
-    _render_decisions_history(policy_api)
-
-
-def _render_decisions_history(policy_api: PolicyAnalysisFacade) -> None:
-    """Histórico de decisões já registradas (RF-04 — auditoria)."""
-    st.subheader("Decisões registradas")
-    decisions: list[ReviewItem] = policy_api.list_review_decisions()
-    if not decisions:
-        st.caption("Nenhuma decisão registrada ainda.")
+        _render_history(policy_api)
         return
-    for item in decisions:
-        fact = item.fact
-        st.info(
-            f"{fact.policy_id} · {fact.field_code} · {item.revisao_status} "
-            f"· por {item.revisao_por or 'n/a'} em {item.revisao_em or 'n/a'}"
-        )
-        st.caption(f"decisão: {item.revisao_decisao} · status do fato: {fact.status}")
+
+    issues: list[Issue] = []
+    for policy_id in sorted({item.fact.policy_id for item in queue}):
+        issues.extend(policy_api.list_issues(policy_id))
+    items_by_fact_id = {item.fact.fact_id: item for item in queue}
+    for severity, facts in group_by_severity([item.fact for item in queue], issues):
+        st.subheader(f"Severidade {severity.value}")
+        for fact in facts:
+            item = items_by_fact_id[fact.fact_id]
+            st.warning(
+                f"{fact.policy_id} · {fact.field_code} · {fact.status} "
+                f"(evidências: {', '.join(fact.evidence_ids) or 'n/a'})"
+            )
+            st.caption(f"valor atual: {fact.value} · revisão: {item.revisao_status}")
+            _render_evidence(policy_api, fact.policy_id, fact.field_code)
+            corrected = st.text_input("Valor corrigido", key=f"fix_{fact.fact_id}")
+            col_confirm, col_correct, col_diverge = st.columns(3)
+            with col_confirm:
+                if st.button("Confirmar", key=f"confirm_{fact.fact_id}"):
+                    _review_action(
+                        "CONFIRMADO",
+                        policy_api.record_review_decision,
+                        fact.fact_id,
+                        "CONFIRMADO",
+                        reviewer,
+                    )
+            with col_correct:
+                if st.button("Corrigir valor", key=f"correct_{fact.fact_id}"):
+                    _review_action(
+                        "CORRIGIDO",
+                        policy_api.record_review_decision,
+                        fact.fact_id,
+                        "CORRIGIDO",
+                        reviewer,
+                        corrected,
+                    )
+            with col_diverge:
+                if st.button("Registrar divergência", key=f"diverge_{fact.fact_id}"):
+                    _review_action(
+                        "DIVERGENTE",
+                        policy_api.record_review_decision,
+                        fact.fact_id,
+                        "DIVERGENTE",
+                        reviewer,
+                    )
+    _render_history(policy_api)

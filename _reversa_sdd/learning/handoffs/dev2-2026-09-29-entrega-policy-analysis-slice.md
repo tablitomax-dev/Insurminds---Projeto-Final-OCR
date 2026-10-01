@@ -1,9 +1,9 @@
-# Handoff Dev 2 — Entrega `001-dev2-policy-analysis-slice` (resumo para o assistente de IA do Dev 1)
+# Handoff Dev 2 — Entrega `dev2-001-policy-analysis-slice` (resumo para o assistente de IA do Dev 1)
 
 > **Destinatário:** assistente de IA do Dev 1 (pbena) — leitura integral recomendada antes de revisar/integrar.
 > **Data:** 2026-09-29 · **Autor:** Dev 2
 > **Branch:** `feature/dev2-policy-analysis-slice` (4 commits, push pendente de permissão no GitHub)
-> **Base:** `98e5bd3` (main antiga) — os commits NÃO contêm o código do fluxo paralelo (`001-vertical-slice-e2e`/P0); apenas o planejamento dele foi incorporado.
+> **Base:** `98e5bd3` (main antiga) — os commits NÃO contêm o código do fluxo paralelo (`dev1-001-vertical-slice-e2e`/P0); apenas o planejamento dele foi incorporado.
 
 ---
 
@@ -13,14 +13,14 @@ Implementação completa do **vertical slice do módulo `policy_analysis` (Dev 2
 
 - **Código:** `src/modules/policy_analysis/` (camadas `domain` / `application` / `infrastructure` / `public_api`)
 - **Testes:** `tests/modules/policy_analysis/` — **120 testes verdes** no total (67 de contrato da Fase 0 + 53 novos, incluindo E2E dos 7 cenários Gherkin)
-- **Artefatos de planejamento/auditoria:** `_reversa_forward/001-dev2-policy-analysis-slice/` + adendo em `_reversa_sdd/addenda/`
+- **Artefatos de planejamento/auditoria:** `_reversa_forward/dev2-001-policy-analysis-slice/` + adendo em `_reversa_sdd/addenda/`
 
 ## 2. Commits incluídos nesta entrega
 
 | Commit | O que contém |
 |--------|--------------|
 | `e29c420` | Feature completa: módulo `policy_analysis`, 53 testes, demo ponta a ponta, artefatos do ciclo forward, adendo 001 |
-| `cf00a49` | Planejamento complementar trazido do remoto (`_reversa_sdd/learning/` com `plano-acao-dev2.md`, features `001-vertical-slice-e2e`/`002`/`003` e adendos) + Reversa v1.3.4 + estado reconciliado |
+| `cf00a49` | Planejamento complementar trazido do remoto (`_reversa_sdd/learning/` com `plano-acao-dev2.md`, features `dev1-001-vertical-slice-e2e`/`002`/`003` e adendos) + Reversa v1.3.4 + estado reconciliado |
 | `9fcd8e1` | Export migrado de PDF para **Markdown** (decisão OQ-04 revisada) — `markdown_export.py` no lugar de `pdf_export.py` |
 | `ac6d43a` | Export padronizado em **`exports/<ComparisonId>.md`** (alinhado ao fluxo paralelo) e **OQ-04 fechada na spec** `policy-analysis.md` |
 
@@ -132,16 +132,16 @@ python -B -m modules.policy_analysis.demo   # demo ponta a ponta → exports/<Co
 | `src/modules/policy_analysis/infrastructure/pdf_export.py` | **novo** (posteriormente removido no `9fcd8e1`) |
 | `src/modules/policy_analysis/demo.py` | **novo** — fluxo ponta a ponta offline/Gemini |
 | `tests/modules/policy_analysis/` (12 arquivos) | **novos** — `conftest.py`, `fixtures/apolice_{a,b}.json`, `test_field_catalog/value_types/comparison/repository/extraction_agent/review_queue/explanation/export_pdf/architecture/e2e_flow.py` |
-| `_reversa_forward/001-dev2-policy-analysis-slice/` (10 artefatos) | **novos** — requirements, roadmap, investigation, data-delta, onboarding, actions, progress.jsonl, legacy-impact, regression-watch, interfaces/llm-provider |
-| `_reversa_sdd/addenda/001-dev2-policy-analysis-slice.md` | **novo** — adendo de convergência (vigente) |
+| `_reversa_forward/dev2-001-policy-analysis-slice/` (10 artefatos) | **novos** — requirements, roadmap, investigation, data-delta, onboarding, actions, progress.jsonl, legacy-impact, regression-watch, interfaces/llm-provider |
+| `_reversa_sdd/addenda/dev2-001-policy-analysis-slice.md` | **novo** — adendo de convergência (vigente) |
 | `.reversa/config.toml` | seção `[specs]` preenchida (`granularity = "feature"`) |
-| `.reversa/active-requirements.json` | **novo** — feature ativa `001-dev2-policy-analysis-slice` |
+| `.reversa/active-requirements.json` | **novo** — feature ativa `dev2-001-policy-analysis-slice` |
 | `requirements.txt` | +`pydantic-ai`, `duckdb`, `fpdf2` (este removido depois) |
 
 ### `cf00a49` — planejamento e framework
 
 - `_reversa_sdd/learning/` (4 docs: `plano-acao-dev2.md`, `plano-acao-dev1.md`, `aprendizados.md`, `benchmark-repos-referencia.md`) — **novos**, trazidos do remoto sem alteração.
-- `_reversa_forward/001-vertical-slice-e2e/`, `002-p0-dev1-documental-rag/`, `003-p0-dev2-analise-experiencia/` + adendos 001/002/003 — **novos**, trazidos do remoto sem alteração.
+- `_reversa_forward/dev1-001-vertical-slice-e2e/`, `dev1-002-p0-documental-rag/`, `dev2-003-p0-analise-experiencia/` + adendos 001/002/003 — **novos**, trazidos do remoto sem alteração.
 - `.agents/skills/`, `.claude/skills/` + `.reversa/version` + `.reversa/_config/` — Reversa v1.3.4.
 - `.reversa/state.json` — mesclado: `forward_progress` (fluxo paralelo) preservado + `forward_progress_dev2` acrescentado + `completed_stages` estendido.
 - `.reversa/plan.md` — 2 linhas acrescentadas na seção "Implementação (/reversa-forward)".
@@ -166,7 +166,7 @@ python -B -m modules.policy_analysis.demo   # demo ponta a ponta → exports/<Co
 |--------------------|------------------------|-------------------|
 | `src/shared_kernel/` | **NENHUMA alteração** — apenas consumo dos contratos (verificado por teste de arquitetura) | zero |
 | `_reversa_sdd/sdd/policy-analysis.md` | Única edição: linha da OQ-04 (§14) marcada RESOLVIDA com decisão Markdown | baixo (uma linha; Dev 1 não mexe nas OQs do Dev 2) |
-| `_reversa_sdd/addenda/` | 1 arquivo novo (`001-dev2-policy-analysis-slice.md`); adendos do fluxo paralelo preservados intocados | zero (nomes distintos) |
+| `_reversa_sdd/addenda/` | 1 arquivo novo (`dev2-001-policy-analysis-slice.md`); adendos do fluxo paralelo preservados intocados | zero (nomes distintos) |
 | `_reversa_sdd/learning/` | Somente leitura/adição dos handoffs | zero |
 | `.reversa/state.json` | Mesclagem manual: preservamos todos os campos do fluxo paraleiro e acrescentamos `forward_progress_dev2` | médio se outro agente reescrever o arquivo — **mesclar, nunca sobrescrever** |
 | `.reversa/plan.md` | 2 linhas acrescentadas (registro das entregas) | baixo |
@@ -180,7 +180,7 @@ python -B -m modules.policy_analysis.demo   # demo ponta a ponta → exports/<Co
 2. Resolver a permissão de escrita (conta `amitigiovani-prog` no repo) → `git push -u origin feature/dev2-policy-analysis-slice` → abrir PR **com este handoff na descrição**.
 3. Decisão de base do `policy_analysis` (adotar o do PR #4 ou fundir) — nossa branch é a garantia de que nada se perde em qualquer cenário.
 4. Em alterações futuras nas zonas da tabela acima: **mesclar `state.json`/`plan.md` linha a linha**, nunca sobrescrever; `shared_kernel` só via PR conjunto; specs só via adendos.
-5. Nossos artefatos de feature ficam isolados em `_reversa_forward/001-dev2-policy-analysis-slice/` — não colidem com os do fluxo paralelo.
+5. Nossos artefatos de feature ficam isolados em `_reversa_forward/dev2-001-policy-analysis-slice/` — não colidem com os do fluxo paralelo.
 
 ---
 

@@ -7,6 +7,7 @@ from decimal import Decimal
 
 import pytest
 
+from modules.policy_analysis.domain.field_catalog import get_field
 from modules.policy_analysis.domain.value_types import (
     Money,
     NormalizationError,
@@ -23,6 +24,7 @@ from modules.policy_analysis.domain.value_types import (
     parse_date,
     parse_decimal,
     period_key,
+    raw_value_from_text,
     text_key,
 )
 
@@ -89,3 +91,33 @@ def test_normalizacao_por_tipo_gera_chave_comparavel():
 def test_normalizacao_de_texto_vazio_falha():
     with pytest.raises(NormalizationError):
         normalize_text_value({"text": "   "})
+
+
+def test_raw_value_from_text_monta_value_por_tipo_do_campo():
+    assert raw_value_from_text(get_field("extensao_territorial"), "Mundial") == {
+        "text": "Mundial",
+    }
+    assert raw_value_from_text(
+        get_field("prazo_notificacao_sinistro"), "90", original={"number": "60", "unit": "dias"}
+    ) == {"number": "90", "unit": "dias"}
+    assert raw_value_from_text(
+        get_field("franquia"), "R$ 60.000,00", original={"amount": "50000.00", "currency": "BRL"}
+    ) == {"amount": "R$ 60.000,00", "currency": "BRL"}
+    assert raw_value_from_text(get_field("franquia"), "60000") == {
+        "amount": "60000",
+        "currency": "BRL",
+    }
+    assert raw_value_from_text(get_field("retroatividade"), "01/01/2015") == {
+        "date": "01/01/2015",
+    }
+    assert raw_value_from_text(get_field("vigencia"), "01/01/2025 a 01/01/2026") == {
+        "start": "01/01/2025",
+        "end": "01/01/2026",
+    }
+
+
+def test_raw_value_from_text_periodo_exige_duas_datas_e_texto_vazio_falha():
+    with pytest.raises(NormalizationError):
+        raw_value_from_text(get_field("vigencia"), "01/01/2025")
+    with pytest.raises(NormalizationError):
+        raw_value_from_text(get_field("franquia"), "   ")

@@ -20,7 +20,7 @@ O export do resumo da comparação é **Markdown**, em todos os fluxos do projet
 | `_reversa_sdd/sdd/policy-analysis.md` | OQ-04 | questão-respondida | Formato do export = **Markdown** (fica como resposta da OQ; a coluna de "questão em aberto" mantém o registro histórico) |
 | `_reversa_sdd/prd.md` | §Critérios (resumo exportado) | regra-alterada | "Resumo exportado capaz de defender a análise" = **Markdown** (formato não estava especificado) |
 | `_reversa_sdd/learning/plano-acao-dev2.md` | `D2-P0` (ComparisonService) | sem-mudança | Já diz "export Markdown" 🟢 — consistente com a decisão |
-| `_reversa_forward/001-vertical-slice-e2e/roadmap.md` | D-09 | sem-mudança | Já implementado como Markdown standalone (`exports/<ComparisonId>.md`); a ressalva "formato precisa virar PDF/HTML depois" é **superada** — não sai de Markdown |
+| `_reversa_forward/dev1-001-vertical-slice-e2e/roadmap.md` | D-09 | sem-mudança | Já implementado como Markdown standalone (`exports/<ComparisonId>.md`); a ressalva "formato precisa virar PDF/HTML depois" é **superada** — não sai de Markdown |
 
 ## Consequência prática
 
@@ -31,5 +31,5 @@ O export do resumo da comparação é **Markdown**, em todos os fluxos do projet
 
 - Decisão do usuário (pbena), 2026-09-27
 - `_reversa_sdd/sdd/policy-analysis.md` (OQ-04)
-- `_reversa_forward/001-vertical-slice-e2e/roadmap.md` (D-09)
+- `_reversa_forward/dev1-001-vertical-slice-e2e/roadmap.md` (D-09)
 - `_reversa_sdd/learning/plano-acao-dev2.md` (export Markdown 🟢)

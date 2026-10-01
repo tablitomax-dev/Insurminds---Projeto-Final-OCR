@@ -1,7 +1,7 @@
 # Aprendizados — o que fazer, o que não fazer, falhas e acertos
 
 > Data: `2026-09-26` (ISO 8601) · Versão: **v1.0** (consolidada após debate multiagente: 3 críticos × 2 rodadas — arquitetura/qualidade, entrega/processo, valor/Reversa)
-> Escopo: Fase 0 (contratos), feature `001-vertical-slice-e2e` (21 ações, 137 passed/4 skipped), `reversa-sync`, PR/GitHub CLI, benchmark de 3 repositórios externos.
+> Escopo: Fase 0 (contratos), feature `dev1-001-vertical-slice-e2e` (21 ações, 137 passed/4 skipped), `reversa-sync`, PR/GitHub CLI, benchmark de 3 repositórios externos.
 > Escala: 🟢 CONFIRMADO (executado/verificado no código) · 🟡 INFERIDO (com ressalva) · 🔴 LACUNA (validação humana pendente)
 > Uso: fonte única dos mandamentos. Os planos `plano-acao-dev1.md` (IDs `D1-*`) e `plano-acao-dev2.md` (IDs `D2-*`) citam os IDs daqui (`F-xx` = falha, `A-xx` = acerto). Itens de ambiente vão ao **Apêndice A**.
 
@@ -14,7 +14,7 @@ Cada item registra **o que aconteceu**, a **causa raiz** e a **regra resultante*
 | ID | Falha | Causa raiz | Regra resultante | Evidência | Conf. |
 |----|-------|-----------|------------------|-----------|-------|
 | F-01 | `git commit` com heredoc bash no PowerShell falhou (parse) | Comando POSIX colado em Windows/PowerShell | Nunca heredoc bash no PowerShell; commit via string multilinha ou `-F arquivo` | sessão 2026-09-26 (operação — ver Apêndice A) | 🟢 |
-| F-02 | E2E quebrou e a suspeita inicial foi "bug do código" | Pré-condição do teste incompleta (faltava extrair `franquia` do lado A) | Falha de teste: auditar pré-condições do teste ANTES de mexer no código | `_reversa_forward/001-vertical-slice-e2e/actions.md` §Notas de execução | 🟢 |
+| F-02 | E2E quebrou e a suspeita inicial foi "bug do código" | Pré-condição do teste incompleta (faltava extrair `franquia` do lado A) | Falha de teste: auditar pré-condições do teste ANTES de mexer no código | `_reversa_forward/dev1-001-vertical-slice-e2e/actions.md` §Notas de execução | 🟢 |
 | F-03 | `PytestUnknownMarkWarning: integration` | Marker sem registro em `pyproject.toml` | Todo marker registrado; warning aponta configuração ausente | `pyproject.toml` (corrigido) | 🟢 |
 | F-12 | Análise dos 3 repositórios externos ficou só no chat | Entrega sem artefato | Todo resultado de valor é gravado em `_reversa_sdd/`/`_reversa_forward/` na hora — chat não é repositório | `benchmark-repos-referencia.md` (reparo) | 🟢 |
 | F-14 | Contrato `RetrievalQuery` promete 4 filtros; `retrieve_evidence` descarta `section_name`/`field_code` em silêncio e o consumidor (Dev 2) achava que filtrava | Parâmetro de contrato sem teste de propagação | Parâmetro de contrato nunca é ignorado em silêncio: ou implementado, ou removido com revisão dos dois; teste de contrato por parâmetro | `src/modules/document_processing/application/service.py` (linhas 150-158) — verificado em 2026-09-26 | 🟢 |
@@ -36,9 +36,9 @@ Cada item registra **o que aconteceu**, a **causa raiz** e a **regra resultante*
 | A-07 | Validação de saída de LLM contra o contrato (EC-05; `evidence_ids` ⊆ recebidos; erro → nada de fato persistido) | Anti-alucinação na fronteira | Todo output de LLM passa por schema + ancoragem em evidência antes de persistir/apresentar | `policy_analysis/application/extraction.py` | 🟢 |
 | A-08 | Comparação 100% determinística (7 direções); LLM jamais compara | Reproduzível e auditável | LLM extrai e explica; regra compara | `policy_analysis/domain/comparison.py` | 🟢 |
 | A-09 | Idempotência por design (`uuid5` estável; delete+upsert) | Reprocessar não duplica — testado | Todo recurso reprocessável nasce idempotente com teste de reprocessamento | `infrastructure/indexing.py` | 🟢 |
-| A-10 | Decisões de slice documentadas (`requirements.md#10`) + alternativas descartadas (`investigation.md#2`) | Cada default tem justificativa rastreável | Toda decisão registra: escolha, descartadas, porquê | `_reversa_forward/001-vertical-slice-e2e/requirements.md` §10 | 🟢 |
+| A-10 | Decisões de slice documentadas (`requirements.md#10`) + alternativas descartadas (`investigation.md#2`) | Cada default tem justificativa rastreável | Toda decisão registra: escolha, descartadas, porquê | `_reversa_forward/dev1-001-vertical-slice-e2e/requirements.md` §10 | 🟢 |
 | A-11 | Integração real opt-in (marker `integration`, skip gracioso) | Suíte verde sem infra | Externa nunca bloqueia suíte; fake sempre presente | `tests/integration/` | 🟢 |
-| A-12 | Convergência via adendo (`reversa-sync`) em vez de re-extração | Extração vigente + impacto mapeado, custo baixo | Forward converge por adendo; re-extração só para divergência estrutural | `_reversa_sdd/addenda/001-vertical-slice-e2e.md` | 🟢 |
+| A-12 | Convergência via adendo (`reversa-sync`) em vez de re-extração | Extração vigente + impacto mapeado, custo baixo | Forward converge por adendo; re-extração só para divergência estrutural | `_reversa_sdd/addenda/dev1-001-vertical-slice-e2e.md` | 🟢 |
 | A-13 | Erros classificados por estágio (`EXTRACT:`/`OCR:`/`INDEXING:`) — classificação acertou | Diagnóstico rápido | Erro carrega prefixo de estágio. ⚠️ Ressalva: a regra "log sem texto de apólice" era **falsa** — `service._cause` retorna `str(exc)` cru e erros podem vazar texto (ver ação `T-2`); materializam-na a sanitização de exceções + teste anti-vazamento | `service.py:203-216` (verificado) | 🟡 |
 | A-14 | Normalização tolerante pt-br (`1.000.000,00`, `dd/mm/aaaa`) testada | Comparação não quebra em formatação | Normalizar na borda de entrada; nunca comparar string crua | `domain/comparison.py` | 🟢 |
 | A-15 | Adaptação às restrições do sandbox em vez de forçá-las | Desbloqueou o trabalho sem loop de retry | Restrição de ambiente = mudança de rota imediata + registro | Apêndice A | 🟡 |
@@ -73,7 +73,7 @@ Cada item registra **o que aconteceu**, a **causa raiz** e a **regra resultante*
 
 ## 5. Convenções de coordenação (decididas no debate)
 
-1. **IDs de ação prefixados pelo dono:** `D1-*` (Dev 1), `D2-*` (Dev 2), `T-*` (transversal). Numeração dentro de cada faixa de prioridade.
+1. **IDs de ação prefixados pelo dono:** `D1-*` (Dev 1), `D2-*` (Dev 2), `T-*` (transversal). Numeração dentro de cada faixa de prioridade. **Pastas de feature em `_reversa_forward/`** seguem `<dev>-<NNN>-<slug>` (ex.: `dev1-005-p1-proveniencia`, `dev2-003-p0-analise-experiencia`) — prefixo do dono + número histórico preservado (convenção do humano, 2026-09-30; resolve a colisão `001-*` duplicada).
 2. **Caixa postal de mudança de contrato:** proposta em `_reversa_forward/<feature>/contract-delta-*.md` → aceite/negativa do outro dev com prazo (1 dia útil; silêncio = escalada ao humano) → serialização: **uma mudança de contrato por vez**; quem propõe bumpa `CONTRACTS_VERSION` e atualiza consumidores.
 3. **Gate local de qualidade (T-1):** comando único (`ruff` + `mypy` + `python -B -m pytest -q -p no:cacheprovider`) obrigatório antes de todo PR; dono do comando: Dev 2; execução: ambos. GitHub Actions = fora desta rodada.
 4. **Marco de PR:** checar estado remoto (`gh pr list --state all`) antes de criar PR; feature concluída → `regression-watch.md` → `/reversa-sync` (plano B: adendo manual em markdown).
@@ -85,6 +85,12 @@ Cada item registra **o que aconteceu**, a **causa raiz** e a **regra resultante*
    d. passos sequenciais que outro desenvolvedor deve seguir para evitar conflitos de merge ao trabalhar nas mesmas seções de código;
    e. quando as alterações interferem em trechos de código compartilhados com outro desenvolvedor: relatório completo de todas as ações executadas nesses trechos compartilhados.
    Objetivo: evitar divergências de código, manter histórico versionado e acessível a todos, e garantir que o assistente de IA dos outros desenvolvedores interprete corretamente as modificações. Vale para todos os colaboradores e assistentes, sem exceção e sem data de término.
+   **Fonte canônica desta regra é este arquivo (`aprendizados.md` §5)** — em caso de divergência com qualquer cópia (ex.: `CLAUDE.md`), este documento prevalece.
+7. **Gestão de documentos normativos (`CLAUDE.md` × `aprendizados.md`) — REGRA PERPÉTUA** (decidida pelo humano em 2026-09-30): os dois documentos existem por papéis diferentes e com **texto nunca duplicado**:
+   a. `CLAUDE.md` = bootstrap de sessão (injetado em toda sessão de IA): ativação do Reversa, regras não-negociáveis de escrita, política `reversa-config.json` e **ponteiro curto** para o texto completo de cada regra;
+   b. `_reversa_sdd/learning/aprendizados.md` = **fonte canônica do texto completo** das regras e convenções;
+   c. se um assunto existir nos dois lugares, manter o texto completo **só aqui** e deixar no `CLAUDE.md` resumo/ponteiro;
+   d. **cláusula de desempate:** havendo divergência do mesmo assunto entre `CLAUDE.md` e este arquivo, **prevalece este arquivo** (rede de segurança — o mecanismo principal é não duplicar texto).
 
 ## 6. Rastreabilidade: aprendizado → ação
 
@@ -124,3 +130,4 @@ Cada item registra **o que aconteceu**, a **causa raiz** e a **regra resultante*
 | 2026-09-26 | v0 | Redação inicial (orquestrador) |
 | 2026-09-26 | v1.0 | Debate multiagente (3 críticos × 2 rodadas): F-04..F-11 → Apêndice A; F-13 → benchmark §4; novas lições F-14/F-15/F-16/A-16; A-02 e A-13 com ressalvas 🟡; convenções de coordenação (§5); rastreabilidade com donos `D1-`/`D2-`/`T-` |
 | 2026-09-27 | v1.1 | Convenção §5.6 (regra perpétua, decisão do humano pbena): registro obrigatório e detalhado em todo commit e PR — histórico de alterações, arquivos/trechos modificados, funcionalidades, passos anti-conflito de merge e relatório de áreas compartilhadas |
+| 2026-09-30 | v1.2 | Convenção §5.7 (decisão do humano pbena): modelo "dois arquivos, sem duplicata" entre `CLAUDE.md` (bootstrap + ponteiro) e `aprendizados.md` (fonte canônica), com cláusula de desempate; §5.6 declarada fonte canônica deste arquivo |

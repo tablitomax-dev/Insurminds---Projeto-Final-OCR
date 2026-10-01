@@ -14,7 +14,7 @@ from shared_kernel.contracts import ExtractedFact
 
 from ..domain.field_catalog import get_field
 from ..domain.models import ReviewItem
-from ..domain.value_types import normalize_value
+from ..domain.value_types import normalize_value, raw_value_from_text
 
 
 class ReviewService:
@@ -31,16 +31,15 @@ class ReviewService:
         ]
 
     def list_decisions(self, policy_id: str | None = None) -> list[ReviewItem]:
-        """Decisões já registradas (histórico) — itens com decisão do analista.
+        """Histórico de revisões decididas por humano (RF-04).
 
-        Diferente de `list_pending`, filtra por decisão registrada
-        (`revisao_decisao` preenchido), não por status: fatos que nasceram
-        `CONFIRMADO`/`PENDENTE` sem intervenção não são decisões.
+        Fatos que não precisavam de revisão nascem `CONFIRMADO` sem revisor;
+        o sinal de decisão humana é `revisao_por` preenchido.
         """
         return [
             item
             for item in self._repo.get_review_items(policy_id)
-            if item.revisao_decisao is not None
+            if item.revisao_por is not None
         ]
 
     def record_decision(
@@ -48,7 +47,7 @@ class ReviewService:
         fact_id: str,
         decision: str,
         decided_by: str,
-        value: dict | None = None,
+        value: dict | str | None = None,
     ) -> ExtractedFact:
         if decision not in ("CONFIRMADO", "CORRIGIDO", "DIVERGENTE"):
             raise ValueError(f"decisão inválida: {decision!r}")
@@ -61,8 +60,11 @@ class ReviewService:
         if decision == "CORRIGIDO":
             if value is None:
                 raise ValueError("decisão CORRIGIDO exige value")
+            field = get_field(item.fact.field_code)
+            if isinstance(value, str):
+                value = raw_value_from_text(field, value, original=item.fact.value)
             new_value = value
-            new_normalized = normalize_value(get_field(item.fact.field_code), value)
+            new_normalized = normalize_value(field, value)
 
         revisado_em = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         if decision == "DIVERGENTE":
