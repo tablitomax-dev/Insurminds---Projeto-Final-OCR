@@ -14,7 +14,7 @@ from shared_kernel.contracts import ExtractedFact
 
 from ..domain.field_catalog import get_field
 from ..domain.models import ReviewItem
-from ..domain.value_types import normalize_value
+from ..domain.value_types import normalize_value, raw_value_from_text
 
 
 class ReviewService:
@@ -30,12 +30,24 @@ class ReviewService:
             if item.revisao_status == "PENDENTE"
         ]
 
+    def list_decisions(self, policy_id: str | None = None) -> list[ReviewItem]:
+        """Histórico de revisões decididas por humano (RF-04).
+
+        Fatos que não precisavam de revisão nascem `CONFIRMADO` sem revisor;
+        o sinal de decisão humana é `revisao_por` preenchido.
+        """
+        return [
+            item
+            for item in self._repo.get_review_items(policy_id)
+            if item.revisao_por is not None
+        ]
+
     def record_decision(
         self,
         fact_id: str,
         decision: str,
         decided_by: str,
-        value: dict | None = None,
+        value: dict | str | None = None,
     ) -> ExtractedFact:
         if decision not in ("CONFIRMADO", "CORRIGIDO"):
             raise ValueError(f"decisão inválida: {decision!r}")
@@ -48,8 +60,11 @@ class ReviewService:
         if decision == "CORRIGIDO":
             if value is None:
                 raise ValueError("decisão CORRIGIDO exige value")
+            field = get_field(item.fact.field_code)
+            if isinstance(value, str):
+                value = raw_value_from_text(field, value, original=item.fact.value)
             new_value = value
-            new_normalized = normalize_value(get_field(item.fact.field_code), value)
+            new_normalized = normalize_value(field, value)
 
         self._repo.record_review(
             fact_id,
