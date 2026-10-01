@@ -34,12 +34,13 @@ class ReviewService:
         """Histórico de revisões decididas por humano (RF-04).
 
         Fatos que não precisavam de revisão nascem `CONFIRMADO` sem revisor;
-        o sinal de decisão humana é `revisao_por` preenchido.
+        o sinal de decisão humana é a decisão registrada (`revisao_decisao`
+        preenchido) — reconciliação §7 do handoff do Dev 1.
         """
         return [
             item
             for item in self._repo.get_review_items(policy_id)
-            if item.revisao_por is not None
+            if item.revisao_decisao is not None
         ]
 
     def record_decision(
