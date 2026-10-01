@@ -38,8 +38,8 @@ def _render_evidence(
 
 
 def render_review(policy_api: PolicyAnalysisFacade) -> None:
-    """Fila de revisão agrupada por severidade + ações Confirmar/Corrigir (RF-04)."""
-    st.header("4. Revisão humana (Confirmar / Corrigir valor)")
+    """Fila de revisão agrupada por severidade + ações Confirmar/Corrigir/Divergência (RF-04)."""
+    st.header("4. Revisão humana (Confirmar / Corrigir valor / Registrar divergência)")
     st.caption(
         "Toda decisão grava revisor, timestamp, valor original e valor corrigido, ligada ao "
         "EvidenceRef do fato — o valor revisado alimenta a comparação."
@@ -48,40 +48,66 @@ def render_review(policy_api: PolicyAnalysisFacade) -> None:
     queue: list[ReviewItem] = policy_api.list_review_queue()
     if not queue:
         st.write("Nenhuma sinalização pendente.")
-        return
+    else:
+        issues: list[Issue] = []
+        for policy_id in sorted({item.fact.policy_id for item in queue}):
+            issues.extend(policy_api.list_issues(policy_id))
+        items_by_fact_id = {item.fact.fact_id: item for item in queue}
+        for severity, facts in group_by_severity([item.fact for item in queue], issues):
+            st.subheader(f"Severidade {severity.value}")
+            for fact in facts:
+                item = items_by_fact_id[fact.fact_id]
+                st.warning(
+                    f"{fact.policy_id} · {fact.field_code} · {fact.status} "
+                    f"(evidências: {', '.join(fact.evidence_ids) or 'n/a'})"
+                )
+                st.caption(f"valor atual: {fact.value} · revisão: {item.revisao_status}")
+                _render_evidence(policy_api, fact.policy_id, fact.field_code)
+                corrected = st.text_input("Valor corrigido", key=f"fix_{fact.fact_id}")
+                col_confirm, col_correct, col_diverge = st.columns(3)
+                with col_confirm:
+                    if st.button("Confirmar", key=f"confirm_{fact.fact_id}"):
+                        _review_action(
+                            "CONFIRMADO",
+                            policy_api.record_review_decision,
+                            fact.fact_id,
+                            "CONFIRMADO",
+                            reviewer,
+                        )
+                with col_correct:
+                    if st.button("Corrigir valor", key=f"correct_{fact.fact_id}"):
+                        _review_action(
+                            "CORRIGIDO",
+                            policy_api.record_review_decision,
+                            fact.fact_id,
+                            "CORRIGIDO",
+                            reviewer,
+                            {"text": corrected},
+                        )
+                with col_diverge:
+                    if st.button("Registrar divergência", key=f"diverge_{fact.fact_id}"):
+                        _review_action(
+                            "DIVERGENTE",
+                            policy_api.record_review_decision,
+                            fact.fact_id,
+                            "DIVERGENTE",
+                            reviewer,
+                        )
 
-    issues: list[Issue] = []
-    for policy_id in sorted({item.fact.policy_id for item in queue}):
-        issues.extend(policy_api.list_issues(policy_id))
-    items_by_fact_id = {item.fact.fact_id: item for item in queue}
-    for severity, facts in group_by_severity([item.fact for item in queue], issues):
-        st.subheader(f"Severidade {severity.value}")
-        for fact in facts:
-            item = items_by_fact_id[fact.fact_id]
-            st.warning(
-                f"{fact.policy_id} · {fact.field_code} · {fact.status} "
-                f"(evidências: {', '.join(fact.evidence_ids) or 'n/a'})"
-            )
-            st.caption(f"valor atual: {fact.value} · revisão: {item.revisao_status}")
-            _render_evidence(policy_api, fact.policy_id, fact.field_code)
-            corrected = st.text_input("Valor corrigido", key=f"fix_{fact.fact_id}")
-            col_confirm, col_correct = st.columns(2)
-            with col_confirm:
-                if st.button("Confirmar", key=f"confirm_{fact.fact_id}"):
-                    _review_action(
-                        "CONFIRMADO",
-                        policy_api.record_review_decision,
-                        fact.fact_id,
-                        "CONFIRMADO",
-                        reviewer,
-                    )
-            with col_correct:
-                if st.button("Corrigir valor", key=f"correct_{fact.fact_id}"):
-                    _review_action(
-                        "CORRIGIDO",
-                        policy_api.record_review_decision,
-                        fact.fact_id,
-                        "CORRIGIDO",
-                        reviewer,
-                        {"text": corrected},
-                    )
+    _render_decisions_history(policy_api)
+
+
+def _render_decisions_history(policy_api: PolicyAnalysisFacade) -> None:
+    """Histórico de decisões já registradas (RF-04 — auditoria)."""
+    st.subheader("Decisões registradas")
+    decisions: list[ReviewItem] = policy_api.list_review_decisions()
+    if not decisions:
+        st.caption("Nenhuma decisão registrada ainda.")
+        return
+    for item in decisions:
+        fact = item.fact
+        st.info(
+            f"{fact.policy_id} · {fact.field_code} · {item.revisao_status} "
+            f"· por {item.revisao_por or 'n/a'} em {item.revisao_em or 'n/a'}"
+        )
+        st.caption(f"decisão: {item.revisao_decisao} · status do fato: {fact.status}")

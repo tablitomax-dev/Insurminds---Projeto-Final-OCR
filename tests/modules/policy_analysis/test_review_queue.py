@@ -87,3 +87,53 @@ def test_corrigido_sem_valor_e_invalido(fixture_a, evidences_a):
             decision="CORRIGIDO",
             decided_by="analista@insurminds",
         )
+
+
+# --- DIVERGENTE (3ª ação — Must do PRD §9) + histórico de decisões -----------
+
+
+def test_decisao_divergente_registra_sem_resolver_fato(fixture_a, evidences_a):
+    repo, extraction, review = build(fixture_a, evidences_a)
+    extraction.extract_fields("POL-A", ALL_CODES)
+
+    updated = review.record_decision(
+        "FAC-POL-A-indice_reajuste",
+        decision="DIVERGENTE",
+        decided_by="analista@insurminds",
+    )
+    # não resolve o fato: não vira FOUND e continua sinalizado
+    assert updated.status == "AMBIGUOUS"
+    assert updated.requires_human_review is True
+    # sai apenas da fila de pendentes
+    assert review.list_pending("POL-A") == []
+
+
+def test_historico_lista_decisoes_registradas(fixture_a, evidences_a):
+    repo, extraction, review = build(fixture_a, evidences_a)
+    extraction.extract_fields("POL-A", ALL_CODES)
+    assert review.list_decisions("POL-A") == []
+
+    review.record_decision(
+        "FAC-POL-A-indice_reajuste",
+        decision="DIVERGENTE",
+        decided_by="analista@insurminds",
+    )
+    decisions = review.list_decisions("POL-A")
+    assert len(decisions) == 1
+    assert decisions[0].revisao_status == "DIVERGENTE"
+    assert decisions[0].revisao_por == "analista@insurminds"
+    assert decisions[0].revisao_em is not None
+
+
+def test_tres_acoes_disponiveis_e_decisao_invalida_rejeitada(fixture_a, evidences_a):
+    repo, extraction, review = build(fixture_a, evidences_a)
+    extraction.extract_fields("POL-A", ALL_CODES)
+
+    for decision in ("CONFIRMADO", "CORRIGIDO", "DIVERGENTE"):
+        assert decision in ("CONFIRMADO", "CORRIGIDO", "DIVERGENTE")
+    with pytest.raises(ValueError):
+        review.record_decision(
+            "FAC-POL-A-indice_reajuste",
+            decision="DECISAO_INVALIDA",
+            decided_by="analista@insurminds",
+        )

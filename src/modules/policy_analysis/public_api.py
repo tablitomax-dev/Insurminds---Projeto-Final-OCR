@@ -105,6 +105,10 @@ class PolicyAnalysisFacade:
     def list_review_queue(self, policy_id: str | None = None) -> list[ReviewItem]:
         return self._review.list_pending(policy_id)
 
+    def list_review_decisions(self, policy_id: str | None = None) -> list[ReviewItem]:
+        """Histórico de decisões já registradas (CONFIRMADO/CORRIGIDO/DIVERGENTE)."""
+        return self._review.list_decisions(policy_id)
+
     def record_review_decision(
         self, fact_id: str, decision: str, decided_by: str, value: dict | None = None
     ) -> ExtractedFact:
