@@ -40,5 +40,5 @@ Nunca crie nem edite `.reversa/reversa-config.json` por iniciativa própria: ped
 
 O texto completo das regras perpétua — **registro detalhado em commits/PRs** (§5.6) e **gestão de documentos normativos** (§5.7) — vive em `_reversa_sdd/learning/aprendizados.md` §5, que é a **fonte canônica**. Este arquivo guarda só bootstrap e ponteiro: nunca duplique texto de regra aqui.
 
-- **Cláusula de desempate:** havendo divergência do mesmo assunto entre este arquivo e `_reversa_sdd/learning/aprendizados.md`, **prevalece `aprendizados.md`**.
+- **Cláusula de desempate:** havendo divergência do mesmo assunto entre este arquivo e `_reversa_sdd/learning/aprendizados.md`, **prevalece `aprendizados.md`**. O protocolo de colaboração Dev 1 × Dev 2 (PRs mergeáveis + cascata de decisão) vive em [`_reversa_sdd/learning/protocolo-colaboracao-dev1-dev2.md`](./_reversa_sdd/learning/protocolo-colaboracao-dev1-dev2.md).
 - Resumo operacional (não normativo): todo commit, push e PR registra histórico detalhado — arquivos/trechos modificados, funcionalidades, passos anti-conflito de merge e relatório de zonas compartilhadas; cada entrega publica handoff em `_reversa_sdd/learning/handoffs/`.

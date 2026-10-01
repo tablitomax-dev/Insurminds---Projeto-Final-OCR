@@ -96,3 +96,33 @@ def test_explicacao_de_campo_inexistente_falha_claro():
     with pytest.raises(ClassifiedError) as exc:
         service.explain_difference("CMP-1", "campo_qualquer")
     assert exc.value.code == "COMPARISON_FIELD_NOT_FOUND"
+
+
+# --- D2-P2-1: fallback determinístico quando o provedor do LLM falha --------
+
+
+class FailingAgent:
+    """Provedor indisponível (levanta ClassifiedError como o provider real)."""
+
+    def explain(self, campo, run_id):
+        raise ClassifiedError("LLM_UNAVAILABLE", "provedor indisponível", retriable=True)
+
+
+def test_provedor_indisponivel_usa_fallback_deterministico():
+    repo = build_repo_with_comparison()
+    service = ExplanationService(repo, FailingAgent())
+
+    explanation = service.explain_difference("CMP-1", "franquia")
+    # nunca quebra: gera explicação citando as evidências dos dois lados
+    assert explanation.field_code == "franquia"
+    assert set(explanation.evidence_ids) == {"EV-A-003", "EV-B-003"}
+    assert "MAIOR" in explanation.text
+    # determinístico: mesmo campo → mesmo texto
+    again = ExplanationService(repo, FailingAgent()).explain_difference("CMP-1", "franquia")
+    assert again.text == explanation.text
+
+
+def test_fallback_persiste_a_explicacao():
+    repo = build_repo_with_comparison()
+    ExplanationService(repo, FailingAgent()).explain_difference("CMP-1", "franquia")
+    assert repo.get_comparison("CMP-1").campos[0].explicacao is not None

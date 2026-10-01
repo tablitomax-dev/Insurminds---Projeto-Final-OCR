@@ -106,7 +106,7 @@ class PolicyAnalysisFacade:
         return self._review.list_pending(policy_id)
 
     def list_review_decisions(self, policy_id: str | None = None) -> list[ReviewItem]:
-        """Histórico de revisões decididas por humano (CONFIRMADO/CORRIGIDO com revisor)."""
+        """Histórico de revisões decididas por humano (CONFIRMADO/CORRIGIDO/DIVERGENTE)."""
         return self._review.list_decisions(policy_id)
 
     def record_review_decision(

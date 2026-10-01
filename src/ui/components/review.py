@@ -52,8 +52,8 @@ def _render_history(policy_api: PolicyAnalysisFacade) -> None:
 
 
 def render_review(policy_api: PolicyAnalysisFacade) -> None:
-    """Fila de revisão agrupada por severidade + ações Confirmar/Corrigir (RF-04)."""
-    st.header("4. Revisão humana (Confirmar / Corrigir valor)")
+    """Fila de revisão agrupada por severidade + ações Confirmar/Corrigir/Divergência (RF-04)."""
+    st.header("4. Revisão humana (Confirmar / Corrigir valor / Registrar divergência)")
     st.caption(
         "Toda decisão grava revisor, timestamp, valor original e valor corrigido, ligada ao "
         "EvidenceRef do fato — o valor revisado alimenta a comparação."
@@ -80,7 +80,7 @@ def render_review(policy_api: PolicyAnalysisFacade) -> None:
             st.caption(f"valor atual: {fact.value} · revisão: {item.revisao_status}")
             _render_evidence(policy_api, fact.policy_id, fact.field_code)
             corrected = st.text_input("Valor corrigido", key=f"fix_{fact.fact_id}")
-            col_confirm, col_correct = st.columns(2)
+            col_confirm, col_correct, col_diverge = st.columns(3)
             with col_confirm:
                 if st.button("Confirmar", key=f"confirm_{fact.fact_id}"):
                     _review_action(
@@ -99,5 +99,14 @@ def render_review(policy_api: PolicyAnalysisFacade) -> None:
                         "CORRIGIDO",
                         reviewer,
                         corrected,
+                    )
+            with col_diverge:
+                if st.button("Registrar divergência", key=f"diverge_{fact.fact_id}"):
+                    _review_action(
+                        "DIVERGENTE",
+                        policy_api.record_review_decision,
+                        fact.fact_id,
+                        "DIVERGENTE",
+                        reviewer,
                     )
     _render_history(policy_api)

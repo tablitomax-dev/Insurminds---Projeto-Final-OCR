@@ -34,12 +34,13 @@ class ReviewService:
         """Histórico de revisões decididas por humano (RF-04).
 
         Fatos que não precisavam de revisão nascem `CONFIRMADO` sem revisor;
-        o sinal de decisão humana é `revisao_por` preenchido.
+        o sinal de decisão humana é a decisão registrada (`revisao_decisao`
+        preenchido) — reconciliação §7 do handoff do Dev 1.
         """
         return [
             item
             for item in self._repo.get_review_items(policy_id)
-            if item.revisao_por is not None
+            if item.revisao_decisao is not None
         ]
 
     def record_decision(
@@ -49,7 +50,7 @@ class ReviewService:
         decided_by: str,
         value: dict | str | None = None,
     ) -> ExtractedFact:
-        if decision not in ("CONFIRMADO", "CORRIGIDO"):
+        if decision not in ("CONFIRMADO", "CORRIGIDO", "DIVERGENTE"):
             raise ValueError(f"decisão inválida: {decision!r}")
         item = self._repo.get_review_item(fact_id)
         if item is None:
@@ -66,15 +67,31 @@ class ReviewService:
             new_value = value
             new_normalized = normalize_value(field, value)
 
-        self._repo.record_review(
-            fact_id,
-            decision,
-            {"decisao": decision, "value": value},
-            decided_by,
-            datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            new_value=new_value,
-            new_normalized_value=new_normalized,
-            new_status="FOUND",
-            requires_human_review=False,
-        )
+        revisado_em = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        if decision == "DIVERGENTE":
+            # Registrar divergência: documenta para auditoria sem resolver o fato —
+            # continua sinalizado (sai apenas da fila de pendentes), sem virar FOUND.
+            self._repo.record_review(
+                fact_id,
+                "DIVERGENTE",
+                {"decisao": "DIVERGENTE", "value": None},
+                decided_by,
+                revisado_em,
+                new_value=None,
+                new_normalized_value=None,
+                new_status=None,
+                requires_human_review=True,
+            )
+        else:
+            self._repo.record_review(
+                fact_id,
+                decision,
+                {"decisao": decision, "value": value},
+                decided_by,
+                revisado_em,
+                new_value=new_value,
+                new_normalized_value=new_normalized,
+                new_status="FOUND",
+                requires_human_review=False,
+            )
         return self._repo.get_review_item(fact_id).fact

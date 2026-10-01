@@ -125,9 +125,42 @@ def test_corrigido_com_texto_invalido_para_o_tipo_e_rejeitado(fixture_a, evidenc
         )
 
 
+# --- DIVERGENTE (3ª ação — Must do PRD §9) ----------------------------------
+
+
+def test_decisao_divergente_registra_sem_resolver_fato(fixture_a, evidences_a):
+    repo, extraction, review = build(fixture_a, evidences_a)
+    extraction.extract_fields("POL-A", ALL_CODES)
+
+    updated = review.record_decision(
+        "FAC-POL-A-indice_reajuste",
+        decision="DIVERGENTE",
+        decided_by="analista@insurminds",
+    )
+    # não resolve o fato: não vira FOUND e continua sinalizado
+    assert updated.status == "AMBIGUOUS"
+    assert updated.requires_human_review is True
+    # sai apenas da fila de pendentes
+    assert review.list_pending("POL-A") == []
+
+
+def test_tres_acoes_disponiveis_e_decisao_invalida_rejeitada(fixture_a, evidences_a):
+    repo, extraction, review = build(fixture_a, evidences_a)
+    extraction.extract_fields("POL-A", ALL_CODES)
+
+    with pytest.raises(ValueError):
+        review.record_decision(
+            "FAC-POL-A-indice_reajuste",
+            decision="DECISAO_INVALIDA",
+            decided_by="analista@insurminds",
+        )
+
+
 def test_historico_so_lista_decisoes_humanas(fixture_a, evidences_a):
     repo, extraction, review = build(fixture_a, evidences_a)
     extraction.extract_fields("POL-A", ALL_CODES)
+    assert review.list_decisions("POL-A") == []
+
     review.record_decision(
         "FAC-POL-A-indice_reajuste",
         decision="CONFIRMADO",
