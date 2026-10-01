@@ -19,6 +19,6 @@ def compute_content_fingerprint(text: str) -> str:
 
     Mesmo texto ⇒ mesmo resumo em qualquer execução; textos distintos ⇒
     resumos distintos. A semântica adotada está registrada na feature
-    `005-p1-dev1-proveniencia` (caixa postal `contract-delta-chunkmetadata.md`).
+    `dev1-005-p1-proveniencia` (caixa postal `contract-delta-chunkmetadata.md`).
     """
     return hashlib.sha256(text.encode("utf-8")).hexdigest()

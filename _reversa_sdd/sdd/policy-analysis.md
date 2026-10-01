@@ -207,7 +207,7 @@ PolicyAnalysisFacade (public_api)
 | OQ-01 | Catálogo fechado dos ~10 `field_code`: quais exatamente entram no vertical slice e qual a semântica/normalização de cada um? | Alto | Dev 2 (propõe) + Dev 1 (revisa) | Antes do vertical slice |
 | OQ-02 | Estratégia de prompts dos agentes (1 prompt por campo vs 1 agente multi-campo)? | Médio | Dev 2 | Antes do vertical slice |
 | OQ-03 | Regras de comparação por tipo de valor (moeda, período, texto livre): tabela de regras inicial. | Alto | Dev 2 + Dev 1 (revisa) | Antes do vertical slice |
-| OQ-04 | Formato do export (Markdown? PDF? XLSX?) para a defesa da análise. **RESOLVIDA em 2026-09-26: Markdown standalone (`exports/<ComparisonId>.md`)** — decisão do Dev 2 alinhada ao fluxo de implementação (`_reversa_forward/001-vertical-slice-e2e/` e `001-dev2-policy-analysis-slice/`) | Baixo | Dev 2 + persona | Resolvida |
+| OQ-04 | Formato do export (Markdown? PDF? XLSX?) para a defesa da análise. **RESOLVIDA: Markdown standalone (`exports/<ComparisonId>.md`) em todos os fluxos** — decisão do humano (pbena, 2026-09-27). **Fonte canônica: `_reversa_sdd/addenda/decisao-export-markdown.md`** (prevalece sobre qualquer versão anterior desta linha; supera PDF/HTML/XLSX) | Baixo | Dev 2 + persona | Resolvida |
 
 ---
 

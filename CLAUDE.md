@@ -36,15 +36,9 @@ Antes de criar, modificar ou apagar qualquer arquivo fora das pastas próprias d
 
 Nunca crie nem edite `.reversa/reversa-config.json` por iniciativa própria: pedido na conversa não é liberação implícita, alterações nesse arquivo são ato exclusivo do usuário.
 
-## Regra perpétua de entregas (commits, PRs e pushes) — Dev 2
+## Regras perpétua (entregas e documentos)
 
-**Vigor permanente, a partir de 2026-09-29, definida pelo usuário.** Todo commit, push ou Pull Request do Dev 2 DEVE incluir, nos campos de comentário (corpo do commit / descrição do PR / arquivo de handoff), um histórico detalhado contendo obrigatoriamente:
+O texto completo das regras perpétua — **registro detalhado em commits/PRs** (§5.6) e **gestão de documentos normativos** (§5.7) — vive em `_reversa_sdd/learning/aprendizados.md` §5, que é a **fonte canônica**. Este arquivo guarda só bootstrap e ponteiro: nunca duplique texto de regra aqui.
 
-1. **Lista exata de arquivos e trechos de código modificados** — arquivo + função/seção alterada, por commit.
-2. **Funcionalidades adicionadas ou corrigidas** — o quê mudou no comportamento.
-3. **Passos sequenciais que outro desenvolvedor deve seguir para evitar conflitos de merge** ao trabalhar nas mesmas seções do código (ordem de integração, o que não sobrescrever).
-4. **Relatório completo de ações executadas em trechos compartilhados** — sempre que a alteração tocar código/zonas em que outro desenvolvedor também trabalha (ex.: `src/shared_kernel/`, specs em `_reversa_sdd/sdd/`, `.reversa/`, `requirements.txt`).
-
-Além disso, cada entrega do Dev 2 publica um **resumo para leitura do assistente de IA do Dev 1** em `_reversa_sdd/learning/handoffs/` (um arquivo por entrega, formato do arquivo `dev2-2026-09-29-entrega-policy-analysis-slice.md`).
-
-Objetivo: evitar divergências de código, manter histórico versionado e acessível a todos, e garantir que os assistentes de IA dos outros desenvolvedores interpretem corretamente as modificações, minimizando erros de integração.
+- **Cláusula de desempate:** havendo divergência do mesmo assunto entre este arquivo e `_reversa_sdd/learning/aprendizados.md`, **prevalece `aprendizados.md`**.
+- Resumo operacional (não normativo): todo commit, push e PR registra histórico detalhado — arquivos/trechos modificados, funcionalidades, passos anti-conflito de merge e relatório de zonas compartilhadas; cada entrega publica handoff em `_reversa_sdd/learning/handoffs/`.

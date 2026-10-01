@@ -42,7 +42,7 @@ Incompatibilidades de assinatura entre as cópias (agrava o risco de quem "vence
 `_reversa_sdd/sdd/policy-analysis.md` foi **modificado** (OQ-04 marcada como resolvida). Pelo método (regra do Reversa + `/reversa-sync`), artefatos da extração não se alteram — superação é via **adendo**. Nós já temos o adendo canônico `_reversa_sdd/addenda/decisao-export-markdown.md` (decisão do **humano pbena**, 2026-09-27). A marcação na spec atribui a decisão ao Dev 2 com data `2026-09-26` — datas/donos divergem entre spec e adendo.
 
 ### C5 — MÉDIO · Numeração de feature duplicada
-`_reversa_forward/001-dev2-policy-analysis-slice` colide com `_reversa_forward/001-vertical-slice-e2e` (dois prefixos `001`). Idem para o adendo `001-dev2-policy-analysis-slice.md`. Risco: ambiguidade de referência nos próximos ciclos.
+`_reversa_forward/dev2-001-policy-analysis-slice` colide com `_reversa_forward/dev1-001-vertical-slice-e2e` (dois prefixos `001`). Idem para o adendo `dev2-001-policy-analysis-slice.md`. Risco: ambiguidade de referência nos próximos ciclos.
 
 ### C6 — BAIXO · `CLAUDE.md` editado fora da política de allowedPaths
 O Dev 2 acrescentou a "Regra perpétua de entregas (commits, PRs e pushes) — Dev 2". Conteúdo **convergente** com a nossa convenção §5.6 (`aprendizados.md`, decisão perpétua de pbena de 2026-09-27), sem conflito literal, mas duplicado em dois lugares — e `CLAUDE.md` está **fora** de `allowedPaths` da política de edição do legado. O acréscimo do handoff em `_reversa_sdd/learning/handoffs/` é novo e útil.
@@ -88,6 +88,15 @@ Itens observados (para decisão futura, sem bloqueio):
 - A UI não lista decisões de revisão já registradas (o `ReviewService` do Dev 2 só expõe pendentes) e o valor corrigido é enviado como `{"text": ...}` (campos não-texto podem levantar `NormalizationError`, sanitizada na UI).
 - `src/modules/evaluation/fixtures/golden_set.json` realinhado aos códigos do catálogo novo (zona compartilhada — registro do agente executor).
 - Continuam pendentes (decisões do humano): colisão de numeração `001-*` em `_reversa_forward/`; marcação da OQ-04 na spec vs adendo canônico; regra perpétua duplicada (CLAUDE.md × `aprendizados.md` §5.6).
+
+### Resolução dos itens observados/pendentes (2026-09-30, decisões do humano pbena)
+
+1. **Mundo anterior morre:** as guardas de extração do ciclo anterior (regras por campo `domain/rules.py`, ancoragem `domain/anchoring.py`) **não voltam** — ficam substituídas de vez pelas validações do Dev 2 (`value_types` + `_build_fact`). Decisão registrada como definitiva.
+2. **UI × decisões de revisão — resolvido:** histórico de decisões humanas na UI (`ReviewService.list_decisions` + `PolicyAnalysisFacade.list_review_decisions` + seção "Histórico de decisões" em `ui/components/review.py`). Semântica: fatos que não precisavam de revisão nascem `CONFIRMADO` sem revisor; a decisão humana é sinalizada por `revisao_por`.
+3. **Valor corrigido `{"text": ...}` — resolvido:** a UI envia texto puro e a coerção por tipo do campo (`raw_value_from_text` em `domain/value_types.py`) monta o `value` (MONEY preserva moeda, NUMBER preserva `unit`, PERIOD exige 2 datas) — nenhuma regra de tipo na UI; `NormalizationError` só para entrada realmente inválida.
+4. **Colisão `001-*` — resolvida (prefixo por dev):** pastas de `_reversa_forward/` e adendos renomeados para `<dev>-<NNN>-<slug>`, números históricos preservados. Mapeamento: `001-vertical-slice-e2e`→`dev1-001-vertical-slice-e2e`; `002-p0-dev1-documental-rag`→`dev1-002-p0-documental-rag`; `005-p1-dev1-proveniencia`→`dev1-005-p1-proveniencia`; `001-dev2-policy-analysis-slice`→`dev2-001-policy-analysis-slice`; `003-p0-dev2-analise-experiencia`→`dev2-003-p0-analise-experiencia`; `004-p1-dev2-experiencia`→`dev2-004-p1-experiencia`. Referências atualizadas em `_reversa_sdd/`, `_reversa_forward/`, `_reversa_bugs/` e 2 comentários em `src/`; `progress.jsonl` preservado como log histórico.
+5. **OQ-04 — resolvida:** a spec `policy-analysis.md` passa a apontar o adendo canônico `_reversa_sdd/addenda/decisao-export-markdown.md` (decisão do humano, Markdown em todos os fluxos).
+6. **Regra perpétua duplicada — resolvida (modelo "dois arquivos, sem duplicata"):** `aprendizados.md` §5 é a fonte canônica do texto completo (§5.6 + cláusula de desempate §5.7); `CLAUDE.md` ficou com bootstrap + ponteiro (aplicado em 2026-09-30 após o usuário liberar `"CLAUDE.md"` no `allowedPaths` do `.reversa/reversa-config.json` — ato exclusivo do usuário).
 
 ## 6. Método da auditoria
 
