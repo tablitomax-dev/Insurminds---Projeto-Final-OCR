@@ -2,7 +2,7 @@
 
 > Data: `2026-09-26` · Versão **v1.0** (pós-debate multiagente 3 críticos × 2 rodadas)
 > Dono: **Desenvolvedor 2** — extração estruturada, validação, revisão humana, DuckDB, comparação, explicação, Streamlit, avaliação.
-> Base: `aprendizados.md` (IDs `F-xx`/`A-xx`/Apêndice A), `benchmark-repos-referencia.md`, `_reversa_sdd/sdd/policy-analysis.md` e `evaluation.md`, `_reversa_sdd/prd.md` (§9 Musts), `_reversa_forward/001-vertical-slice-e2e/`, `resumo_executivo_arquitetura_monolito_modular (1).md` (fora do corpus Reversa — §6.2/§7/§10).
+> Base: `aprendizados.md` (IDs `F-xx`/`A-xx`/Apêndice A), `benchmark-repos-referencia.md`, `_reversa_sdd/sdd/policy-analysis.md` e `evaluation.md`, `_reversa_sdd/prd.md` (§9 Musts), `_reversa_forward/dev1-001-vertical-slice-e2e/`, `resumo_executivo_arquitetura_monolito_modular (1).md` (fora do corpus Reversa — §6.2/§7/§10).
 > Regra-mãe: você transforma **evidências em fatos de negócio** — com validação, revisão humana, comparação determinística e explicação rastreável.
 > Convenções de coordenação (IDs `D2-*`, caixa postal de contrato, gate `T-1`): ver `aprendizados.md` §5.
 

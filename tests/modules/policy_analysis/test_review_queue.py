@@ -87,3 +87,56 @@ def test_corrigido_sem_valor_e_invalido(fixture_a, evidences_a):
             decision="CORRIGIDO",
             decided_by="analista@insurminds",
         )
+
+
+def test_corrigido_com_texto_digitado_coercao_por_tipo_do_campo(fixture_a, evidences_a):
+    repo, extraction, review = build(fixture_a, evidences_a)
+    extraction.extract_fields("POL-A", ALL_CODES)
+
+    money = review.record_decision(
+        "FAC-POL-A-franquia",
+        decision="CORRIGIDO",
+        decided_by="analista@insurminds",
+        value="R$ 60.000,00",
+    )
+    assert money.value == {"amount": "R$ 60.000,00", "currency": "BRL"}
+    assert money.normalized_value == {"amount": "60000.00", "currency": "BRL"}
+
+    period = review.record_decision(
+        "FAC-POL-A-vigencia",
+        decision="CORRIGIDO",
+        decided_by="analista@insurminds",
+        value="01/01/2025 a 01/06/2026",
+    )
+    assert period.value == {"start": "01/01/2025", "end": "01/06/2026"}
+    assert period.normalized_value["duration_days"] == 516
+
+
+def test_corrigido_com_texto_invalido_para_o_tipo_e_rejeitado(fixture_a, evidences_a):
+    repo, extraction, review = build(fixture_a, evidences_a)
+    extraction.extract_fields("POL-A", ALL_CODES)
+
+    with pytest.raises(ValueError):
+        review.record_decision(
+            "FAC-POL-A-vigencia",
+            decision="CORRIGIDO",
+            decided_by="analista@insurminds",
+            value="01/01/2025",
+        )
+
+
+def test_historico_so_lista_decisoes_humanas(fixture_a, evidences_a):
+    repo, extraction, review = build(fixture_a, evidences_a)
+    extraction.extract_fields("POL-A", ALL_CODES)
+    review.record_decision(
+        "FAC-POL-A-indice_reajuste",
+        decision="CONFIRMADO",
+        decided_by="analista@insurminds",
+    )
+
+    decisions = review.list_decisions("POL-A")
+    assert [item.fact.field_code for item in decisions] == ["indice_reajuste"]
+    assert decisions[0].revisao_status == "CONFIRMADO"
+    assert decisions[0].revisao_por == "analista@insurminds"
+    assert decisions[0].revisao_em is not None
+    assert review.list_pending("POL-A") == []

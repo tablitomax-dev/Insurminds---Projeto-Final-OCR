@@ -1,5 +1,5 @@
 {
   "version": 1,
   "allowLegacyEdits": true,
-  "allowedPaths": ["src/**", "tests/**", "pyproject.toml", "requirements.txt", ".gitignore"]
+  "allowedPaths": ["src/**", "tests/**", "pyproject.toml", "requirements.txt", ".gitignore", "CLAUDE.md"]
 }

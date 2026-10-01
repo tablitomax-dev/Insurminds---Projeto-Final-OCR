@@ -37,6 +37,20 @@ def _render_evidence(
         )
 
 
+def _render_history(policy_api: PolicyAnalysisFacade) -> None:
+    """Histórico de revisões já decididas (RF-04)."""
+    decisions = policy_api.list_review_decisions()
+    if not decisions:
+        return
+    with st.expander(f"Histórico de decisões ({len(decisions)})"):
+        for item in decisions:
+            st.caption(
+                f"{item.fact.policy_id} · {item.fact.field_code} · {item.revisao_status} "
+                f"· revisor: {item.revisao_por or 'n/a'} · {item.revisao_em or 'n/a'} "
+                f"· valor: {item.fact.value}"
+            )
+
+
 def render_review(policy_api: PolicyAnalysisFacade) -> None:
     """Fila de revisão agrupada por severidade + ações Confirmar/Corrigir (RF-04)."""
     st.header("4. Revisão humana (Confirmar / Corrigir valor)")
@@ -48,6 +62,7 @@ def render_review(policy_api: PolicyAnalysisFacade) -> None:
     queue: list[ReviewItem] = policy_api.list_review_queue()
     if not queue:
         st.write("Nenhuma sinalização pendente.")
+        _render_history(policy_api)
         return
 
     issues: list[Issue] = []
@@ -83,5 +98,6 @@ def render_review(policy_api: PolicyAnalysisFacade) -> None:
                         fact.fact_id,
                         "CORRIGIDO",
                         reviewer,
-                        {"text": corrected},
+                        corrected,
                     )
+    _render_history(policy_api)

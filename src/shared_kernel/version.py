@@ -10,5 +10,5 @@ Política semântica:
 from typing import Final
 
 #: v1.1.0 (MINOR): `ChunkMetadata.content_fingerprint` opcional (caixa postal
-#: `contract-delta-chunkmetadata.md`, feature 005-p1-dev1-proveniencia).
+#: `contract-delta-chunkmetadata.md`, feature dev1-005-p1-proveniencia).
 CONTRACTS_VERSION: Final[str] = "1.1.0"
