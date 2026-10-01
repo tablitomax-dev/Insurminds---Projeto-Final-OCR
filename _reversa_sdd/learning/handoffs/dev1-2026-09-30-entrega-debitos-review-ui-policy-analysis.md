@@ -80,3 +80,30 @@ Análise profunda (cascata 2.1) concluiu: `domain/rules.py`/`domain/anchoring.py
 **Observações de review (não bloqueiam o merge — corrigir quando conveniente):**
 1. `domain/anchoring.py` `collect_excerpts`: `raw_text` entra duas vezes (chave de citação + varredura de aspas) — infla o contador de citações não ancoradas (a decisão não muda). Deduplicar a lista de chaves.
 2. `domain/rules.py` `moeda_consistente`: moedas mistas na mesma apólice (rara, mas legal) rebaixam todos os monetários — comportamento aceito como sinal para humano; vale comentário de docstring registrando a intenção.
+
+---
+
+## 9. FECHAMENTO (2026-10-01) — PR #11 mesclado: reconciliação §7/§8 executada e validada
+
+O Dev 2 executou o receituário dos §7/§8 e o PR **#11** (`ab0c26b`, `feature/dev2-policy-analysis-slice` → `main`) foi mesclado pelo humano. Commits da reconciliação:
+
+- `153b58f` — merge do `origin/main` (PR #10) na branch, alinhando `policy_analysis` aos débitos A/B (removeu as guardas no processo).
+- `3dee19f` — correção conforme este handoff: **restaurou as guardas** (veredito §8), aplicou o **filtro `revisao_decisao`** (§7) e os **2 acertos de review** do §8 (dedup de `raw_text` em `collect_excerpts`; docstring de intenção em `moeda_consistente`). Mensagem no formato §5.6 completo.
+
+**Verificação do Dev 1 pós-merge (2026-10-01, gate T-1 no `main` unificado):**
+
+| Checagem (regra de ouro §7) | Resultado |
+|---|---|
+| `record_decision` = coerção `raw_value_from_text` + 3 ações (CONFIRMADO/CORRIGIDO/DIVERGENTE) | OK |
+| Histórico único com filtro `revisao_decisao is not None` | OK |
+| Testes de revisão: 9 em `test_review_queue.py` (coerção/histórico nossos + DIVERGENTE do Dev 2) | OK |
+| UI: 3 botões + envio de texto puro + histórico único | OK |
+| `domain/value_types.py` (débito B) intacto | OK |
+| Acertos §8.1/§8.2 aplicados | OK |
+
+- **Gate `T-1` no `main` (`ab0c26b`):** `ruff` All checks passed · `mypy` Success (66 arquivos) · `pytest` **299 passed, 4 skipped**.
+- **Mergeabilidade:** `git merge-tree` main × branch = zero conflitos; docs (`_reversa_sdd/**`) não tocados pela branch.
+
+Notas menores (não bloqueantes, registradas): o Dev 2 usou **merge** (`153b58f`) em vez de rebase — equivalente, histórico preservado; `CLAUDE.md` ganhou ponteiro ao `protocolo-colaboracao-dev1-dev2.md` (aderente ao §5.7 — ponteiro, não duplicata); `DeprecationWarning` de `datetime.utcnow()` em `duckdb_repository.py` (pré-existente, backlog futuro).
+
+**Status: reconciliação FECHADA.** O quadrado `policy_analysis` está unificado no `main` — coerção por tipo + 3 ações de revisão + guardas pós-LLM com os acertos §8. Ambas as observações de review do §8 foram atendidas.

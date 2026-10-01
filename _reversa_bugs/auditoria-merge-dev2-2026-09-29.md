@@ -98,6 +98,10 @@ Itens observados (para decisão futura, sem bloqueio):
 5. **OQ-04 — resolvida:** a spec `policy-analysis.md` passa a apontar o adendo canônico `_reversa_sdd/addenda/decisao-export-markdown.md` (decisão do humano, Markdown em todos os fluxos).
 6. **Regra perpétua duplicada — resolvida (modelo "dois arquivos, sem duplicata"):** `aprendizados.md` §5 é a fonte canônica do texto completo (§5.6 + cláusula de desempate §5.7); `CLAUDE.md` ficou com bootstrap + ponteiro (aplicado em 2026-09-30 após o usuário liberar `"CLAUDE.md"` no `allowedPaths` do `.reversa/reversa-config.json` — ato exclusivo do usuário).
 
+### Fechamento da reconciliação com o trabalho paralelo do Dev 2 (2026-10-01, PR #11)
+
+Os itens 2 e 3 acima (débitos de UI/revisão e valor corrigido) colidiram com o trabalho paralelo do Dev 2 (`5f94063`, `d7a0121`). A reconciliação — mapa de colisão, regra de ouro e veredito das guardas (§7/§8 do handoff `dev1-2026-09-30-entrega-debitos-review-ui-policy-analysis.md`) — foi executada pelo Dev 2 (`153b58f` + `3dee19f`) e o PR **#11** (`ab0c26b`) foi mesclado. Verificado pelo Dev 1: regra de ouro cumprida (`record_decision` = coerção `raw_value_from_text` + 3 ações), histórico único com filtro `revisao_decisao`, 9 testes de revisão, guardas restauradas com os 2 acertos §8, gate `T-1` verde no `main` unificado (299 passed, 4 skipped). **Reconciliação FECHADA** — detalhes no handoff §9.
+
 ## 6. Método da auditoria
 
 - `git fetch --all` + comparação `7bd6cec..95fc44f` (log, diff --stat por área, diff linha a linha nos arquivos compartilhados).
