@@ -10,6 +10,7 @@ provedor real (Gemini via Pydantic AI).
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -22,6 +23,17 @@ from ..application.errors import ClassifiedError
 from ..domain.metrics import KIND_EXPLAIN, KIND_EXTRACT, UsageMetricsCollector
 from ..domain.models import FieldComparison
 from .pricing import compute_cost_usd
+
+# D2-P2-2: prompts versionados — ao alterar build_extraction_prompt /
+# build_explanation_prompt, bumpar a versão correspondente (diff auditável +
+# re-execução do golden set). O hash detecta mudança silenciosa do texto.
+EXTRACTION_PROMPT_VERSION = "extract-v1"
+EXPLANATION_PROMPT_VERSION = "explain-v1"
+
+
+def prompt_fingerprint(prompt: str) -> str:
+    """Hash estável (sha256 curto) do texto do prompt — auditoria de mudança."""
+    return hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:12]
 
 
 class LLMClient(Protocol):
@@ -149,7 +161,15 @@ class MultiFieldExtractionAgent:
         started = time.monotonic()
         raw = _with_retries(lambda: self._client.complete_json(prompt), self._retries, self._backoff)
         _record_usage(self._usage_collector, self._client, run_id, KIND_EXTRACT, started)
-        self.usage.append({"run_id": run_id, "operation": "extract", "prompt_chars": len(prompt)})
+        self.usage.append(
+            {
+                "run_id": run_id,
+                "operation": "extract",
+                "prompt_chars": len(prompt),
+                "prompt_version": EXTRACTION_PROMPT_VERSION,
+                "prompt_hash": prompt_fingerprint(prompt),
+            }
+        )
         if isinstance(raw, dict):
             raw = raw.get("facts", raw)
         raw = _parse_structured(raw, list)
@@ -180,7 +200,15 @@ class LLMExplanationAgent:
         started = time.monotonic()
         raw = _with_retries(lambda: self._client.complete_json(prompt), self._retries, self._backoff)
         _record_usage(self._usage_collector, self._client, run_id, KIND_EXPLAIN, started)
-        self.usage.append({"run_id": run_id, "operation": "explain", "prompt_chars": len(prompt)})
+        self.usage.append(
+            {
+                "run_id": run_id,
+                "operation": "explain",
+                "prompt_chars": len(prompt),
+                "prompt_version": EXPLANATION_PROMPT_VERSION,
+                "prompt_hash": prompt_fingerprint(prompt),
+            }
+        )
         parsed = _parse_structured(raw, dict)
         return {"text": parsed.get("text"), "evidence_ids": parsed.get("evidence_ids")}
 
@@ -249,14 +277,23 @@ class PydanticAIClient:
             agent = Agent(model, output_type=dict)
         except TypeError:  # versões antigas do pydantic-ai
             agent = Agent(model, result_type=dict)  # type: ignore[call-overload]
-        result = agent.run_sync(prompt)
+        # D2-P0-1: temperature=0 em extração/explicação (determinismo do prompt).
+        run_kwargs: dict[str, Any] = {}
+        try:
+            from pydantic_ai.settings import ModelSettings
+
+            run_kwargs["model_settings"] = ModelSettings(temperature=0.0)
+        except Exception:  # SDK sem ModelSettings → segue sem a trava explícita
+            pass
+        result = agent.run_sync(prompt, **run_kwargs)
         output = getattr(result, "output", None)
         if output is None:
             output = getattr(result, "data", None)
         # RNF-03: tokens/custo por execução registrados via run_id do chamador
         tokens = None
         try:
-            usage = result.usage()
+            usage_attr = getattr(result, "usage", None)
+            usage = usage_attr() if callable(usage_attr) else usage_attr
             tokens = getattr(usage, "total_tokens", None) or dict(vars(usage))
         except Exception:
             pass

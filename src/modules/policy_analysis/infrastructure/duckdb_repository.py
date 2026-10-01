@@ -67,6 +67,22 @@ CREATE TABLE IF NOT EXISTS comparisons (
 """
 
 
+#: Migrações versionadas do schema (D2-P2-3). A baseline `001` é o schema
+#: atual (4 tabelas). Para evoluir: acrescentar `{N: SQL}` e bumpar — cada
+#: migração roda uma vez e fica registrada em `schema_migrations`. Os
+#: `CREATE ... IF NOT EXISTS` mantêm a adoção de bancos antigos idempotente.
+_MIGRATIONS: dict[int, str] = {
+    1: _SCHEMA,
+}
+
+_MIGRATIONS_TABLE = """
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    version INTEGER PRIMARY KEY,
+    applied_at TIMESTAMP
+);
+"""
+
+
 def _dumps(value) -> str | None:
     return None if value is None else json.dumps(value, ensure_ascii=False, sort_keys=True)
 
@@ -83,7 +99,18 @@ class PolicyAnalysisRepository:
         self.init_schema()
 
     def init_schema(self) -> None:
-        self._con.execute(_SCHEMA)
+        self._con.execute(_MIGRATIONS_TABLE)
+        applied = {
+            row[0] for row in self._con.execute("SELECT version FROM schema_migrations").fetchall()
+        }
+        for version in sorted(_MIGRATIONS):
+            if version in applied:
+                continue
+            self._con.execute(_MIGRATIONS[version])
+            self._con.execute(
+                "INSERT INTO schema_migrations (version, applied_at) VALUES (?, now())",
+                [version],
+            )
 
     # --- apólices e documentos -------------------------------------------------
 

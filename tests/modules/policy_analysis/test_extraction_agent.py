@@ -161,6 +161,30 @@ def test_resposta_nao_estruturada_e_rejeitada():
     assert exc.value.code == "LLM_SCHEMA_INVALID"
 
 
+# --- D2-P2-2: prompts versionados (hash auditável) --------------------------
+
+
+def test_prompt_fingerprint_estavel_e_detecta_mudanca():
+    from modules.policy_analysis.infrastructure.llm_agent import prompt_fingerprint
+
+    assert prompt_fingerprint("abc") == prompt_fingerprint("abc")
+    assert prompt_fingerprint("abc") != prompt_fingerprint("abd")
+
+
+def test_prompts_versionados_registrados_no_uso():
+    from modules.policy_analysis.infrastructure.llm_agent import (
+        EXTRACTION_PROMPT_VERSION,
+    )
+
+    client = FlakyClient(fail_times=0, response={"facts": []})
+    agent = MultiFieldExtractionAgent(client, retries=1, backoff=0)
+    agent.extract([], "RUN-1")
+
+    uso = agent.usage[-1]
+    assert uso["prompt_version"] == EXTRACTION_PROMPT_VERSION
+    assert uso["prompt_hash"]
+
+
 def _memory_repo():
     from modules.policy_analysis.infrastructure.duckdb_repository import PolicyAnalysisRepository
 
