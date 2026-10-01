@@ -7,6 +7,8 @@
 """
 
 import importlib
+import json
+import logging
 import sys
 import types
 from dataclasses import dataclass, field
@@ -60,7 +62,12 @@ class _FakeEmbedding:
 
 def _response_for(texts):
     """Resposta determinística: vetor derivado do tamanho do texto."""
-    return types.SimpleNamespace(embeddings=[_FakeEmbedding([float(len(text))]) for text in texts])
+    return types.SimpleNamespace(
+        embeddings=[_FakeEmbedding([float(len(text))]) for text in texts],
+        usage_metadata=types.SimpleNamespace(
+            total_token_count=sum(len(text.split()) for text in texts)
+        ),
+    )
 
 
 class _FakeGenaiSdk:
@@ -236,6 +243,72 @@ def test_legacy_sdk_also_uses_single_batch_request(indexing):
     assert len(sdk.calls) == 1
     assert sdk.calls[0]["content"] == ["um", "dois", "tres"]
     assert len(vectors) == 3
+
+
+# --------------------- D1-P2-1: métrica de embedding (log estruturado)
+
+
+def _metricas(caplog):
+    """Registros do log estruturado de embeddings, já decodificados (JSON)."""
+    return [
+        json.loads(record.getMessage())
+        for record in caplog.records
+        if record.name == "document_processing.embedding"
+    ]
+
+
+def test_embedder_registra_tokens_e_latencia_no_log_estruturado(indexing, caplog):
+    sdk = _FakeGenaiSdk()
+    embedder = _make_embedder(indexing, sdk, "genai", [])
+
+    with caplog.at_level(logging.INFO, logger="document_processing.embedding"):
+        embedder.embed_texts(["Limite agregado", "Franquia"])
+
+    metricas = _metricas(caplog)
+    assert len(metricas) == 1  # uma métrica por request — UM request por lote
+    metrica = metricas[0]
+    assert metrica["kind"] == "EMBED"
+    assert metrica["model_name"] == "gemini-embedding-001"
+    assert metrica["texts"] == 2
+    assert metrica["total_tokens"] == 3  # fake: 1 token por palavra
+    assert metrica["latency_ms"] >= 0
+
+
+def test_uma_metrica_por_request_quando_o_lote_e_dividido(indexing, caplog):
+    sdk = _FakeGenaiSdk()
+    embedder = _make_embedder(indexing, sdk, "genai", [], max_texts_per_request=2)
+
+    with caplog.at_level(logging.INFO, logger="document_processing.embedding"):
+        embedder.embed_texts(["a", "bb", "ccc"])
+
+    assert [metrica["texts"] for metrica in _metricas(caplog)] == [2, 1]
+
+
+def test_metrica_de_embedding_nunca_carrega_texto_de_aplice(indexing, caplog):
+    sdk = _FakeGenaiSdk()
+    embedder = _make_embedder(indexing, sdk, "genai", [])
+
+    with caplog.at_level(logging.INFO, logger="document_processing.embedding"):
+        embedder.embed_texts([POLICY_TEXT])
+
+    (metrica,) = _metricas(caplog)
+    # T-2a: só números e modelo — nenhuma palavra da apólice no log
+    assert set(metrica) == {"kind", "model_name", "texts", "total_tokens", "latency_ms"}
+    assert "agregado" not in json.dumps(metrica)
+    assert "1.000.000" not in json.dumps(metrica)
+
+
+def test_metrica_sem_usage_na_resposta_reporta_zero_tokens(indexing, caplog):
+    """SDK legado responde SEM `usage_metadata`: métrica sai com tokens 0."""
+    sdk = _FakeLegacySdk()
+    embedder = _make_embedder(indexing, sdk, "generativeai", [])
+
+    with caplog.at_level(logging.INFO, logger="document_processing.embedding"):
+        embedder.embed_texts(["a"])
+
+    (metrica,) = _metricas(caplog)
+    assert metrica["texts"] == 1
+    assert metrica["total_tokens"] == 0
 
 
 # --------------------------------------- fakes do cliente Qdrant (mockado)
