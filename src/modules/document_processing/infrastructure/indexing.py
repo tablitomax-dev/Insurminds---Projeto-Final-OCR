@@ -12,8 +12,15 @@ Resiliência (D1-P0-1/RF-01):
 - Embeddings SEMPRE em lote (no máximo `MAX_EMBEDDING_TEXTS_PER_REQUEST` por
   request); o caminho do SDK legado também usa chamada em lote — sem loop por
   texto (D1-P0-3b/c).
+
+Métricas (D1-P2-1): cada request de embeddings emite uma linha de log
+estruturado (`document_processing.embedding`) com tokens/latência — só
+números e o nome do modelo, NUNCA texto de apólice (T-2a). Sem contrato
+compartilhado novo: o log é o registro durável.
 """
 
+import json
+import logging
 import os
 import time
 import uuid
@@ -66,6 +73,9 @@ TRANSIENT_ERROR_NAMES = frozenset(
         "retryerror",
     }
 )
+
+#: Logger do log estruturado de métricas de embeddings (D1-P2-1).
+EMBEDDING_USAGE_LOGGER = "document_processing.embedding"
 
 #: Namespace estável para derivar IDs de ponto do Qdrant a partir do chunk_id.
 _POINT_NAMESPACE = uuid.uuid5(uuid.NAMESPACE_URL, "document_processing.policy_chunks")
@@ -125,6 +135,26 @@ def _response_embeddings(response: Any) -> list:
             "resposta de embeddings fora do formato esperado (sem 'embeddings')"
         )
     return list(embeddings)
+
+
+def _response_total_tokens(response: Any) -> int:
+    """Extrai o total de tokens da resposta; 0 quando o SDK não reporta.
+
+    Defensivo entre SDKs (mesmo cuidado de `_usage_tokens` do adapter de LLM):
+    só lê números — nunca o texto (T-2a).
+    """
+    usage = getattr(response, "usage_metadata", None)
+    if usage is None and isinstance(response, dict):
+        usage = response.get("usage_metadata") or response.get("usage")
+    if usage is None:
+        return 0
+    if isinstance(usage, dict):
+        total = usage.get("total_token_count", usage.get("total_tokens"))
+    else:
+        total = getattr(usage, "total_token_count", None)
+        if total is None:
+            total = getattr(usage, "total_tokens", None)
+    return int(total) if isinstance(total, (int, float)) else 0
 
 
 class GeminiEmbedder:
@@ -213,6 +243,7 @@ class GeminiEmbedder:
         (self._sleep or time.sleep)(seconds)
 
     def _request_embeddings(self, batch: list[str]) -> list[list[float]]:
+        started = time.monotonic()
         if self._kind == "genai":
             client = self._ensure_client()
             response = client.models.embed_contents(
@@ -220,15 +251,38 @@ class GeminiEmbedder:
                 contents=batch,
                 output_dimensionality=self._output_dimensionality,
             )
-            return [_embedding_values(embedding) for embedding in _response_embeddings(response)]
-        # SDK legado: também em lote — UM `embed_content` por batch (D1-P0-3c).
-        self._sdk.configure(api_key=self._api_key)
-        response = self._sdk.embed_content(
-            model=self._model,
-            content=batch,
-            output_dimensionality=self._output_dimensionality,
+        else:
+            # SDK legado: também em lote — UM `embed_content` por batch (D1-P0-3c).
+            self._sdk.configure(api_key=self._api_key)
+            response = self._sdk.embed_content(
+                model=self._model,
+                content=batch,
+                output_dimensionality=self._output_dimensionality,
+            )
+        embeddings = _response_embeddings(response)
+        self._record_embedding_usage(batch, response, started)
+        return [_embedding_values(embedding) for embedding in embeddings]
+
+    def _record_embedding_usage(
+        self, batch: list[str], response: Any, started: float
+    ) -> None:
+        """Métrica do request de embeddings (D1-P2-1): só números (T-2a).
+
+        Log estruturado durável — tokens (defensivo entre SDKs), latência,
+        tamanho do lote e modelo. NUNCA o texto dos chunks.
+        """
+        logging.getLogger(EMBEDDING_USAGE_LOGGER).info(
+            json.dumps(
+                {
+                    "kind": "EMBED",
+                    "model_name": self._model,
+                    "texts": len(batch),
+                    "total_tokens": _response_total_tokens(response),
+                    "latency_ms": int((time.monotonic() - started) * 1000),
+                },
+                sort_keys=True,
+            )
         )
-        return [_embedding_values(embedding) for embedding in _response_embeddings(response)]
 
     def _ensure_client(self) -> object:
         if self._client is None:
