@@ -56,3 +56,10 @@ Entrega do **NG-01** (o item "fase posterior" do `document-processing.md#4`), es
 
 1. A sobreposição de chunks (`CHUNK_OVERLAP=100`) pode cortar uma tabela entre dois chunks — aceito (E-07): o conteúdo continua recuperável em ambos.
 2. A normalização do SDK do PP-StructureV3 é defensiva (3 formatos aceitos, E-06); o opt-in `-m integration` valida contra o SDK real quando houver Paddle no ambiente.
+
+## 8. FECHAMENTO (2026-10-02)
+
+- **PR #12** (`feat/dev1-006-p2-documento-complexo` → `main`) **mesclado** — merge `1291cd6` (2026-10-02T02:05:03Z), commit de entrega `3180915`. Sem conflitos; `shared_kernel` intocado como previsto (RN-06).
+- **PR #13** (`feat/d1-p2-1-metrica-embedding` → `main`, D1-P2-1) **mesclado** — merge `00580ea` (2026-10-02T02:15:35Z), zero conflito com o #12 (arquivos distintos), como previsto no item 4.
+- **Gate `T-1` no `main` unificado (`00580ea`):** `ruff` All checks passed · `mypy` Success (68 arquivos) · `pytest` **323 passed, 4 skipped**.
+- Estado final: NG-01 encerrado — `section_name` real, tabelas serializadas `[TABELA]`, `source_type="PP_STRUCTURE"` e `layout_mode` em produção no `main`; efeitos do item 2 já valem para o quadrado do Dev 2.
