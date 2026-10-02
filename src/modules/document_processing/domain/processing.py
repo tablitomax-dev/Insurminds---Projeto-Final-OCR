@@ -96,8 +96,13 @@ def build_chunk_metadata(
     chunk_index: int,
     source_type: SourceType,
     ocr_confidence: float | None,
+    section_name: str | None = None,
 ) -> ChunkMetadata:
-    """Monta `ChunkMetadata` versionada (RF-04); `section_name` fica `None` (OQ-03)."""
+    """Monta `ChunkMetadata` versionada (RF-04).
+
+    `section_name` recebe o literal da seção vigente (OQ-03 resolvida pela
+    feature dev1-006); o default `None` preserva o comportamento anterior.
+    """
     return ChunkMetadata(
         chunk_id=chunk_id,
         document_id=document_id,
@@ -106,6 +111,6 @@ def build_chunk_metadata(
         chunk_index=chunk_index,
         source_type=source_type,
         ocr_confidence=ocr_confidence,
-        section_name=None,
+        section_name=section_name,
         metadata_version=CONTRACTS_VERSION,
     )

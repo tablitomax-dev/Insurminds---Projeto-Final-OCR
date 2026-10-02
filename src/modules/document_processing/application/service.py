@@ -6,6 +6,7 @@
 
 import uuid
 from pathlib import Path
+from typing import Literal
 
 from shared_kernel.contracts import EvidenceRef, ProcessingStatus, RetrievalQuery, RetrievalResult
 
@@ -17,7 +18,8 @@ from ..domain.processing import (
     classify_page,
     is_illegible,
 )
-from .ports import Embedder, OcrEngine, StatusSink, TextExtractor, VectorIndex
+from ..domain.structure import assign_sections, compose_page_text
+from .ports import Embedder, LayoutEngine, OcrEngine, StatusSink, TextExtractor, VectorIndex
 
 #: Tamanho máximo aceito do PDF em bytes (RF-01, default 50MB).
 MAX_PDF_BYTES = 50 * 1024 * 1024
@@ -60,6 +62,7 @@ class DocumentProcessingService:
         embedder: Embedder,
         vector_index: VectorIndex,
         status_sink: StatusSink,
+        layout_engine: LayoutEngine | None = None,
         max_pdf_bytes: int = MAX_PDF_BYTES,
     ) -> None:
         self._text_extractor = text_extractor
@@ -67,12 +70,22 @@ class DocumentProcessingService:
         self._embedder = embedder
         self._vector_index = vector_index
         self._status_sink = status_sink
+        self._layout_engine = layout_engine
         self._max_pdf_bytes = max_pdf_bytes
 
     def process_document(
-        self, document_id: str, policy_id: str, file_path: str
+        self,
+        document_id: str,
+        policy_id: str,
+        file_path: str,
+        layout_mode: Literal["scanned", "all"] = "scanned",
     ) -> ProcessingStatus:
-        """Processa um PDF de apólice ponta a ponta e publica cada estágio (RF-06)."""
+        """Processa um PDF de apólice ponta a ponta e publica cada estágio (RF-06).
+
+        `layout_mode` (dev1-006): `"scanned"` analisa o layout só de páginas
+        sem texto nativo suficiente; `"all"` estende a todas. Sem motor de
+        layout ou em falha, o fluxo degrada para o texto extraído (RN-05).
+        """
         if self._validate_pdf(file_path) is not None:
             return self._publish_failed(document_id, "EXTRACT", "arquivo inválido")
 
@@ -91,15 +104,21 @@ class DocumentProcessingService:
             for page in pages:
                 source_type = classify_page(page.text)
                 if source_type == "NATIVE_TEXT":
-                    extracted.append((page.page_number, page.text, "NATIVE_TEXT", None))
-                    continue
-                text, ocr_confidence = self._ocr_engine.ocr_page(
-                    file_path, page.page_number
-                )
-                extracted.append(
-                    (page.page_number, text, "PADDLEOCR", ocr_confidence)
-                )
-                ocr_page_numbers.append(page.page_number)
+                    text, ocr_confidence = page.text, None
+                else:
+                    text, ocr_confidence = self._ocr_engine.ocr_page(
+                        file_path, page.page_number
+                    )
+                    ocr_page_numbers.append(page.page_number)
+                # Layout (dev1-006): análise estrutural da página; degrada
+                # silenciosamente para o texto já extraído (RN-05).
+                if self._layout_engine is not None and (
+                    layout_mode == "all" or source_type != "NATIVE_TEXT"
+                ):
+                    composed = self._layout_page_text(file_path, page.page_number)
+                    if composed:
+                        text, source_type = composed, "PP_STRUCTURE"
+                extracted.append((page.page_number, text, source_type, ocr_confidence))
         except Exception as exc:  # falha de OCR classificada (EC-04)
             return self._publish_failed(document_id, "OCR", _cause(exc))
 
@@ -119,10 +138,14 @@ class DocumentProcessingService:
 
         records: list[ChunkRecord] = []
         illegible_pages: list[int] = []
+        # Seção vigente atravessa páginas: literal do marcador (dev1-006, RN-02).
+        current_section: str | None = None
         for page_number, text, source_type, ocr_confidence in extracted:
             if is_illegible(ocr_confidence):
                 illegible_pages.append(page_number)
-            for chunk_index, chunk in enumerate(chunk_text(text)):
+            pieces = chunk_text(text)
+            sections, current_section = assign_sections(pieces, current_section)
+            for chunk_index, (chunk, section_name) in enumerate(zip(pieces, sections)):
                 chunk_id = f"{document_id}:p{page_number}:c{chunk_index}"
                 metadata = build_chunk_metadata(
                     chunk_id=chunk_id,
@@ -132,6 +155,7 @@ class DocumentProcessingService:
                     chunk_index=chunk_index,
                     source_type=source_type,
                     ocr_confidence=ocr_confidence,
+                    section_name=section_name,
                 )
                 # Proveniência (contrato v1.1.0): sha256 do texto do chunk.
                 metadata.content_fingerprint = compute_content_fingerprint(chunk)
@@ -227,6 +251,22 @@ class DocumentProcessingService:
 
     def _publish(self, status: ProcessingStatus) -> None:
         self._status_sink.publish(status)
+
+    def _layout_page_text(self, file_path: str, page_number: int) -> str | None:
+        """Analisa o layout da página e compõe o texto estruturado (dev1-006).
+
+        `None` = degradação (RN-05): motor ausente/falho mantém o texto já
+        extraído — a falha do motor nunca derruba o processamento. Nenhum
+        texto de apólice sai daqui em log/mensagem (T-2a).
+        """
+        if self._layout_engine is None:
+            return None
+        try:
+            regions = self._layout_engine.analyze_page(file_path, page_number)
+        except Exception:  # RN-05: qualquer falha do motor degrada para texto puro
+            return None
+        composed = compose_page_text(regions)
+        return composed or None
 
     def _publish_failed(self, document_id: str, stage: str, cause: str) -> ProcessingStatus:
         status = ProcessingStatus(

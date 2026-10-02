@@ -2,6 +2,7 @@
 
 from .document_processing import (
     FakeEmbedder,
+    FakeLayoutEngine,
     FakeOcrEngine,
     FakeTextExtractor,
     InMemoryVectorIndex,
@@ -21,10 +22,11 @@ from .policy_analysis import (
 __all__ = [
     "FailingExtractionAgent",
     "FakeEmbedder",
+    "FakeLayoutEngine",
     "FakeOcrEngine",
     "FakeTextExtractor",
-    "FixtureExplanationAgent",
     "FixtureExtractionAgent",
+    "FixtureExplanationAgent",
     "InMemoryFactRepository",
     "InMemoryVectorIndex",
     "MockEvidenceSource",

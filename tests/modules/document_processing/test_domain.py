@@ -12,6 +12,37 @@ from modules.document_processing.domain.processing import (
 )
 from shared_kernel.version import CONTRACTS_VERSION
 
+# --- dev1-006: section_name no metadado (OQ-03 resolvida) -------------------
+
+
+def test_build_chunk_metadata_section_name_recebe_literal():
+    metadata = build_chunk_metadata(
+        chunk_id="doc-1:p1:c0",
+        document_id="doc-1",
+        policy_id="pol-1",
+        page_number=1,
+        chunk_index=0,
+        source_type="NATIVE_TEXT",
+        ocr_confidence=None,
+        section_name="Cláusula 5ª — FRANQUIA",
+    )
+
+    assert metadata.section_name == "Cláusula 5ª — FRANQUIA"
+
+
+def test_build_chunk_metadata_default_section_name_none():
+    metadata = build_chunk_metadata(
+        chunk_id="doc-1:p1:c0",
+        document_id="doc-1",
+        policy_id="pol-1",
+        page_number=1,
+        chunk_index=0,
+        source_type="NATIVE_TEXT",
+        ocr_confidence=None,
+    )
+
+    assert metadata.section_name is None
+
 
 def test_chunk_text_splits_long_text_with_overlap():
     chunks = chunk_text("a" * 900)
