@@ -12,6 +12,8 @@ Regras implementadas sobre o catálogo vigente (`field_catalog`):
   (regra cruzada: recebe os demais valores monetários da apólice).
 - `vigencia_ordem` — `vigencia.inicio <= vigencia.fim` (regra cruzada; cobre
   valores montados fora da normalização).
+- `enum_base_territorial` — `extensao_territorial` ∈ vocabulário fechado de
+  abrangências usuais D&O (fora do enum → sinal de revisão ao humano).
 
 Motivos citam apenas regra/campo — nunca o valor (T-2a).
 """
@@ -21,6 +23,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .field_catalog import FieldDefinition, FieldType
+from .value_types import NormalizationError, normalize_text
 
 #: Moedas usuais em apólices D&O (ISO 4217).
 KNOWN_CURRENCIES: frozenset[str] = frozenset(
@@ -35,6 +38,26 @@ _POSITIVE_CODES: frozenset[str] = frozenset(
         "limite_defesa_custos",
         "prazo_notificacao_sinistro",
         "indice_reajuste",
+    }
+)
+
+#: Vocabulário fechado da base/extensão territorial (D2-P0-3, `enum_base_territorial`).
+#: Formas canônicas já normalizadas (minúsculas, sem acentos — `normalize_text`).
+KNOWN_TERRITORY_BASES: frozenset[str] = frozenset(
+    {
+        "brasil",
+        "eua",
+        "estados unidos",
+        "canada",
+        "europa",
+        "america latina",
+        "america do sul",
+        "america do norte",
+        "mundo",
+        "mundial",
+        "worldwide",
+        "internacional",
+        "exterior",
     }
 )
 
@@ -134,6 +157,36 @@ def _rule_vigencia_ordem(field: FieldDefinition, normalized: dict) -> list[RuleV
     return []
 
 
+def _rule_enum_base_territorial(
+    field: FieldDefinition, normalized: dict
+) -> list[RuleViolation]:
+    """`extensao_territorial` ∈ vocabulário fechado de abrangências D&O.
+
+    Fora do enum → `NEEDS_REVIEW` (sinal ao humano, não erro): texto livre
+    fora do vocabulário pode ser legítimo (ex.: "Mundo exceto EUA"), mas o
+    determinismo da comparação agradece o enum fechado (A-08) — o analista
+    decide na revisão.
+    """
+    if field.code != "extensao_territorial":
+        return []
+    raw = normalized.get("text")
+    if not raw:
+        return []
+    try:
+        text = normalize_text(str(raw))
+    except NormalizationError:
+        return []
+    if text in KNOWN_TERRITORY_BASES:
+        return []
+    return [
+        RuleViolation(
+            "enum_base_territorial",
+            field.code,
+            "valor fora do enum de abrangência territorial",
+        )
+    ]
+
+
 def validate_fact(
     field: FieldDefinition,
     normalized: dict | None,
@@ -152,4 +205,5 @@ def validate_fact(
     violations += _rule_moeda_conhecida(field, normalized)
     violations += _rule_moeda_consistente(field, normalized, other_money_values)
     violations += _rule_vigencia_ordem(field, normalized)
+    violations += _rule_enum_base_territorial(field, normalized)
     return violations
