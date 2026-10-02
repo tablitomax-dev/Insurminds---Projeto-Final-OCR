@@ -48,6 +48,25 @@ class FakeOcrEngine:
         return self.results_by_page.get(page_number, self.default_result)
 
 
+class FakeLayoutEngine:
+    """LayoutEngine fake: regiões determinísticas por página, falha injetável."""
+
+    def __init__(
+        self,
+        regions_by_page: dict[int, list] | None = None,
+        error: Exception | None = None,
+    ) -> None:
+        self.regions_by_page = dict(regions_by_page or {})
+        self.error = error
+        self.calls: list[tuple[str, int]] = []
+
+    def analyze_page(self, file_path: str, page_number: int) -> list:
+        self.calls.append((file_path, page_number))
+        if self.error is not None:
+            raise self.error
+        return list(self.regions_by_page.get(page_number, []))
+
+
 class FakeEmbedder:
     """Embedder fake: vetor determinístico derivado do texto (hashing por token)."""
 
