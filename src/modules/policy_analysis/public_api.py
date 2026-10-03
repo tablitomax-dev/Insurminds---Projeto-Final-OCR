@@ -186,7 +186,7 @@ def create_default_policy_analysis(
     document_processing_facade=None,
     db_path: str = "exports/policy_analysis.duckdb",
     output_dir: str = "exports",
-    model_name: str = "gemini-2.0-flash",
+    model_name: str = "gemini-3.8-flash",
     api_key: str | None = None,
     usage_collector: UsageMetricsCollector | None = None,
     quality_signals: QualitySignalLog | None = None,
