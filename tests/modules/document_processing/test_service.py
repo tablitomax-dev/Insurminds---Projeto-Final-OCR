@@ -6,6 +6,7 @@ import pytest
 
 from fakes.document_processing import (
     FakeEmbedder,
+    FakeLayoutEngine,
     FakeOcrEngine,
     FakeTextExtractor,
     InMemoryVectorIndex,
@@ -13,6 +14,8 @@ from fakes.document_processing import (
 )
 from modules.document_processing.application.ports import (
     EmbeddingError,
+    LayoutError,
+    LayoutRegion,
     ScoredChunk,
     TextExtractionError,
 )
@@ -36,7 +39,7 @@ def _write_pdf(tmp_path, name="apolice.pdf", content=b"%PDF-1.4\nconteudo fake\n
     return str(path)
 
 
-def _build_service(pages_by_path=None, max_pdf_bytes=None):
+def _build_service(pages_by_path=None, max_pdf_bytes=None, layout_engine=None):
     extractor = FakeTextExtractor(pages_by_path=pages_by_path)
     ocr_engine = FakeOcrEngine()
     embedder = FakeEmbedder()
@@ -46,7 +49,7 @@ def _build_service(pages_by_path=None, max_pdf_bytes=None):
     if max_pdf_bytes is not None:
         kwargs["max_pdf_bytes"] = max_pdf_bytes
     service = DocumentProcessingService(
-        extractor, ocr_engine, embedder, index, sink, **kwargs
+        extractor, ocr_engine, embedder, index, sink, layout_engine=layout_engine, **kwargs
     )
     return service, extractor, ocr_engine, embedder, index, sink
 
@@ -479,3 +482,159 @@ def test_retrieve_evidence_clamps_score_to_contract_range():
     result = service.retrieve_evidence(RetrievalQuery(query="apólice", top_k=5))
 
     assert [evidence.retrieval_score for evidence in result.evidences] == [1.0, 0.0]
+
+
+# ------------- dev1-006: estrutura, cláusulas e tabelas (NG-01) — RF-01/RF-04
+
+
+def test_chunks_herdam_literal_do_marcador_vigente(tmp_path):
+    file_path = _write_pdf(tmp_path)
+    page_text = "CLÁUSULA 5ª — FRANQUIA\n" + "a franquia aplicável está descrita aqui. " * 20
+    service, _extractor, _ocr, _embedder, index, _sink = _build_service(
+        {file_path: [PageText(1, page_text)]}
+    )
+
+    status = service.process_document("doc-1", "pol-1", file_path)
+
+    assert status.stage == "INDEXED"
+    assert index.records
+    assert {record.metadata.section_name for record in index.records} == {
+        "CLÁUSULA 5ª — FRANQUIA"
+    }
+
+
+def test_secao_atravessa_paginas_e_chunk_sem_marcador_e_none(tmp_path):
+    file_path = _write_pdf(tmp_path)
+    pages = [
+        PageText(1, "texto introdutório da apólice, sem estrutura. " * 20),
+        PageText(2, "CLÁUSULA 5ª — FRANQUIA\n" + "a franquia aplicável está descrita. " * 20),
+        PageText(3, "continuação das regras da franquia, sem novo marcador. " * 20),
+    ]
+    service, _extractor, _ocr, _embedder, index, _sink = _build_service({file_path: pages})
+
+    service.process_document("doc-1", "pol-1", file_path)
+
+    secao_por_pagina = {
+        record.metadata.page_number: record.metadata.section_name for record in index.records
+    }
+    assert secao_por_pagina == {
+        1: None,
+        2: "CLÁUSULA 5ª — FRANQUIA",
+        3: "CLÁUSULA 5ª — FRANQUIA",
+    }
+
+
+def test_retrieval_por_secao_retorna_so_evidencias_da_clausula(tmp_path):
+    file_path = _write_pdf(tmp_path)
+    pages = [
+        PageText(1, "CLÁUSULA 5ª — FRANQUIA\n" + "a franquia aplicável está descrita. " * 20),
+        PageText(2, "CLÁUSULA 8ª — EXCLUSÕES\n" + "as exclusões aplicáveis estão descritas. " * 20),
+    ]
+    service, _extractor, _ocr, _embedder, index, _sink = _build_service({file_path: pages})
+    service.process_document("doc-1", "pol-1", file_path)
+
+    result = service.retrieve_evidence(
+        RetrievalQuery(query="franquia", top_k=10, section_name="CLÁUSULA 5ª — FRANQUIA")
+    )
+
+    assert result.evidences
+    assert {evidence.section_name for evidence in result.evidences} == {
+        "CLÁUSULA 5ª — FRANQUIA"
+    }
+
+
+# ----------------- dev1-006: layout/tabela (NG-01) — RF-02/RF-03/RF-05
+
+
+def test_pagina_escaneada_com_layout_vira_pp_structure_com_tabela_serializada(tmp_path):
+    file_path = _write_pdf(tmp_path)
+    engine = FakeLayoutEngine(
+        regions_by_page={
+            1: [
+                LayoutRegion(kind="heading", text="CLÁUSULA 5ª — FRANQUIA", order=0),
+                LayoutRegion(kind="table", text="limite\t1000000\nfranquia\t50000", order=1),
+                LayoutRegion(kind="text", text="condições gerais da franquia", order=2),
+            ]
+        }
+    )
+    service, _extractor, _ocr, _embedder, index, _sink = _build_service(
+        {file_path: [PageText(1, "curta")]}, layout_engine=engine
+    )
+
+    status = service.process_document("doc-1", "pol-1", file_path)
+
+    assert status.stage == "INDEXED"
+    assert engine.calls == [(file_path, 1)]
+    record = index.records[0]
+    assert record.metadata.source_type == "PP_STRUCTURE"
+    assert "[TABELA]" in record.text
+    assert "limite | 1000000" in record.text
+    assert record.metadata.section_name == "CLÁUSULA 5ª — FRANQUIA"
+
+
+def test_flag_all_estende_layout_as_paginas_nativas(tmp_path):
+    file_path = _write_pdf(tmp_path)
+    engine = FakeLayoutEngine(
+        regions_by_page={1: [LayoutRegion(kind="text", text="texto do layout em ordem", order=0)]}
+    )
+    service, _extractor, _ocr, _embedder, index, _sink = _build_service(
+        {file_path: [PageText(1, NATIVE_PAGE)]}, layout_engine=engine
+    )
+
+    service.process_document("doc-1", "pol-1", file_path, layout_mode="all")
+
+    assert engine.calls == [(file_path, 1)]
+    record = index.records[0]
+    assert record.metadata.source_type == "PP_STRUCTURE"
+    assert record.text == "texto do layout em ordem"
+
+
+def test_default_scanned_nao_analisa_layout_de_pagina_nativa(tmp_path):
+    file_path = _write_pdf(tmp_path)
+    engine = FakeLayoutEngine()
+    service, _extractor, _ocr, _embedder, index, _sink = _build_service(
+        {file_path: [PageText(1, NATIVE_PAGE)]}, layout_engine=engine
+    )
+
+    service.process_document("doc-1", "pol-1", file_path)
+
+    assert engine.calls == []
+    assert index.records[0].metadata.source_type == "NATIVE_TEXT"
+
+
+def test_falha_do_motor_de_layout_degrada_sem_failed(tmp_path):
+    file_path = _write_pdf(tmp_path)
+    engine = FakeLayoutEngine(error=LayoutError("falha na análise de layout (RuntimeError)"))
+    service, _extractor, _ocr, _embedder, index, _sink = _build_service(
+        {file_path: [PageText(1, "curta")]}, layout_engine=engine
+    )
+    ocr_engine = _ocr
+    ocr_engine.results_by_page[1] = (OCR_TEXT, 0.9)
+
+    status = service.process_document("doc-1", "pol-1", file_path)
+
+    assert status.stage == "INDEXED"  # RN-05: nunca FAILED por causa do motor
+    record = index.records[0]
+    assert record.metadata.source_type == "PADDLEOCR"  # degradou para o texto do OCR
+    assert "texto reconhecido" in record.text
+
+
+# ------------------------- dev1-006: T-2a — nada de apólice em log (RN-07)
+
+
+def test_fluxo_novo_nao_vaza_secao_ou_tabela_para_logs(tmp_path, caplog):
+    file_path = _write_pdf(tmp_path)
+    engine = FakeLayoutEngine(
+        regions_by_page={1: [LayoutRegion(kind="table", text="limite\t1000000", order=0)]}
+    )
+    service, _extractor, _ocr, _embedder, index, _sink = _build_service(
+        {file_path: [PageText(1, "CLÁUSULA 5ª — FRANQUIA\n" + "regras da franquia. " * 30)]},
+        layout_engine=engine,
+    )
+
+    with caplog.at_level(logging.INFO):
+        service.process_document("doc-1", "pol-1", file_path, layout_mode="all")
+
+    mensagens = "\n".join(record.getMessage() for record in caplog.records)
+    assert "FRANQUIA" not in mensagens  # literal da seção não vai para log
+    assert "1000000" not in mensagens  # conteúdo de tabela não vai para log

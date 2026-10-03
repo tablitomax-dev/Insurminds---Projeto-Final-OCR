@@ -9,7 +9,7 @@ sanitizadas — só tipo do erro, estágio e IDs; nunca texto de apólice (T-2a)
 """
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Literal, Protocol
 
 from shared_kernel.contracts import ProcessingStatus
 
@@ -36,12 +36,30 @@ class IndexingError(PortError):
     """Falha no índice vetorial (porta `VectorIndex`)."""
 
 
+class LayoutError(PortError):
+    """Falha na análise de layout de uma página (porta `LayoutEngine`)."""
+
+
 @dataclass
 class ScoredChunk:
     """Resultado de busca: chunk recuperado com score de similaridade."""
 
     record: ChunkRecord
     score: float
+
+
+@dataclass
+class LayoutRegion:
+    """Região normalizada da análise de layout (feature dev1-006, NG-01).
+
+    `kind`: `heading` (título/seção), `table` (TSV — linhas separadas por `\\n`
+    e células por `\\t`) ou `text` (trecho corrido). `order` é a ordem de
+    leitura da região na página. Saída do adapter, NÃO é contrato externo.
+    """
+
+    kind: Literal["heading", "table", "text"]
+    text: str
+    order: int
 
 
 class TextExtractor(Protocol):
@@ -54,6 +72,16 @@ class OcrEngine(Protocol):
     """Aplica OCR a uma página; devolve (texto, confiança média em [0,1])."""
 
     def ocr_page(self, file_path: str, page_number: int) -> tuple[str, float | None]: ...
+
+
+class LayoutEngine(Protocol):
+    """Analisa o layout de uma página; devolve regiões em ordem de leitura.
+
+    Erro externo vira `LayoutError` sanitizado (T-2a). O serviço degrada para
+    texto puro quando o motor está ausente ou falha (RN-05 da dev1-006).
+    """
+
+    def analyze_page(self, file_path: str, page_number: int) -> list[LayoutRegion]: ...
 
 
 class Embedder(Protocol):
