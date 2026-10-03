@@ -48,7 +48,9 @@ known-first-party = ["fakes", "modules", "shared_kernel"]
 "src/modules/document_processing/**" = ["I001"]
 
 [tool.mypy]
-python_version = "3.11"
+# Runtime real do projeto é Python 3.12 (venv) — os stubs de dependências do
+# streamlit (numpy) usam sintaxe 3.12 (`type` statements) e exigem a versão.
+python_version = "3.12"
 ignore_missing_imports = true
 cache_dir = ".tmp/mypy_cache"
 

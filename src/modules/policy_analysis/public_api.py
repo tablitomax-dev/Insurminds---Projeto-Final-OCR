@@ -85,6 +85,7 @@ class PolicyAnalysisFacade:
                     "code": definition.code,
                     "label": definition.label,
                     "description": definition.description,
+                    "unit": definition.unit or "",
                 }
             )
         return fields

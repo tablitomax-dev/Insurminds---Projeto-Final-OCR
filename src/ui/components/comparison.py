@@ -6,6 +6,7 @@ import streamlit as st
 
 from modules.policy_analysis.public_api import PolicyAnalysisFacade
 from ui.errors import sanitize_error_message
+from ui.logic import format_value
 
 
 def render_comparison(
@@ -25,14 +26,15 @@ def render_comparison(
         else:
             st.session_state["comparison_id"] = comparison.comparison_id
             st.caption(f"ComparisonId: {comparison.comparison_id}")
+            units = {field["code"]: field.get("unit") for field in fields}
             st.table(
                 [
                     {
                         "campo": campo.field_code,
                         "resultado": campo.resultado,
                         "direção": campo.direcao,
-                        "valor A": campo.valor_a,
-                        "valor B": campo.valor_b,
+                        "valor A": format_value(campo.valor_a, units.get(campo.field_code)),
+                        "valor B": format_value(campo.valor_b, units.get(campo.field_code)),
                         "evidências A": ", ".join(campo.evidencias_a),
                         "evidências B": ", ".join(campo.evidencias_b),
                     }
