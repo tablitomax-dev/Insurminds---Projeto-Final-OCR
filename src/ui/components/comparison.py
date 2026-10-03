@@ -17,7 +17,7 @@ def render_comparison(
     field_labels: dict[str, str],
 ) -> str | None:
     """Compara A × B e explica diferenças; devolve o `comparison_id` da sessão."""
-    st.header("3. Comparação determinística")
+    st.header("4. Comparação determinística")
     if st.button("Comparar A × B"):
         try:
             comparison = policy_api.compare_policies(policy_id_a, policy_id_b)

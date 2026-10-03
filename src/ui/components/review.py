@@ -53,7 +53,7 @@ def _render_history(policy_api: PolicyAnalysisFacade) -> None:
 
 def render_review(policy_api: PolicyAnalysisFacade) -> None:
     """Fila de revisão agrupada por severidade + ações Confirmar/Corrigir/Divergência (RF-04)."""
-    st.header("4. Revisão humana (Confirmar / Corrigir valor / Registrar divergência)")
+    st.header("5. Revisão humana (Confirmar / Corrigir valor / Registrar divergência)")
     st.caption(
         "Toda decisão grava revisor, timestamp, valor original e valor corrigido, ligada ao "
         "EvidenceRef do fato — o valor revisado alimenta a comparação."

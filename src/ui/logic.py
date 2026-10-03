@@ -16,7 +16,7 @@ from modules.policy_analysis.public_api import (
     Severity,
     UsageSummary,
 )
-from shared_kernel.contracts import ExtractedFact
+from shared_kernel.contracts import EvidenceRef, ExtractedFact
 
 #: Símbolos usuais para exibição monetária (ISO 4217 → leitura humana).
 _CURRENCY_SYMBOLS: dict[str, str] = {
@@ -31,6 +31,16 @@ _CURRENCY_SYMBOLS: dict[str, str] = {
 }
 
 _ISO_DATE = re.compile(r"(\d{4})-(\d{2})-(\d{2})")
+
+#: Origem do texto da evidência → leitura humana do analista.
+_SOURCE_LABELS: dict[str, str] = {
+    "NATIVE_TEXT": "texto nativo",
+    "PADDLEOCR": "OCR (PaddleOCR)",
+    "PP_STRUCTURE": "estrutura de layout",
+}
+
+#: Tamanho máximo do trecho na tabela da consulta (detalhe fica no expander).
+_SNIPPET_LIMIT = 160
 
 
 def group_by_severity(
@@ -140,3 +150,36 @@ def format_value(value: dict | None, unit: str | None = None) -> str:
         return str(value["text"])
     # Valor fora do formato conhecido: só as informações, sem JSON.
     return ", ".join(str(part) for part in value.values() if part not in (None, "")) or "—"
+
+
+# --- consulta livre às evidências -------------------------------------------
+
+
+def _snippet(text: str, limit: int = _SNIPPET_LIMIT) -> str:
+    """Trecho de uma linha só, cortado em `limit` caracteres com reticências."""
+    flat = " ".join(text.split())
+    if len(flat) <= limit:
+        return flat
+    return flat[:limit].rstrip() + "…"
+
+
+def format_evidence_rows(evidences: list[EvidenceRef]) -> list[dict[str, str]]:
+    """Formata as evidências da consulta para a tabela — sem JSON, sem tipos.
+
+    Ausências viram `—`; o score vai em `0,00` pt-BR; o trecho aparece
+    resumido (o texto completo fica no expander da tela de consulta).
+    """
+    rows: list[dict[str, str]] = []
+    for evidence in evidences:
+        score = evidence.retrieval_score
+        rows.append(
+            {
+                "apólice": evidence.policy_id,
+                "página": str(evidence.page_number),
+                "seção": evidence.section_name or "—",
+                "trecho": _snippet(evidence.quoted_text),
+                "score": "—" if score is None else _decimal_br(score, decimals=2),
+                "origem": _SOURCE_LABELS.get(evidence.source_type, evidence.source_type),
+            }
+        )
+    return rows
