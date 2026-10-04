@@ -1,0 +1,30 @@
+# Vocabulário controlado de area/module/feature do registro de bugs.
+# Seed gerado em 2026-10-04 a partir de _reversa_sdd/sdd/*.md (specs SDD vigentes).
+# Novos termos: propostos em Agent Notes do bug e promovidos por decisão humana.
+# Nao invente termos fora deste catalogo; use "unclassified" quando nada servir.
+
+area:
+  - policy-analysis
+  - document-processing
+  - evaluation
+  - shared-kernel
+  - ui
+
+module:
+  - policy_analysis
+  - document_processing
+  - evaluation
+  - shared_kernel
+  - composition_root
+  - ui
+
+feature:
+  - extracao
+  - revisao-humana
+  - comparacao
+  - explicacao
+  - metricas
+  - qualidade
+  - avaliacao
+  - retrieval-evidencias
+  - ingestao-documental

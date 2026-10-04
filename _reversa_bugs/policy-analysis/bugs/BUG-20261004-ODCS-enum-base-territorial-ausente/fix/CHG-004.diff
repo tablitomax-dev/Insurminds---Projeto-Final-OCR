@@ -1,0 +1,74 @@
+# CHG-004 (BUG-20261004-ODCS) — code: regra `enum_base_territorial` em domain/rules.py
+
+Arquivo: src/modules/policy_analysis/domain/rules.py
+
+```diff
+ from __future__ import annotations
+ 
++import unicodedata
+ from dataclasses import dataclass
+ 
+ from .field_catalog import FieldDefinition, FieldType
+```
+
+```diff
+ #: Chaves de escalar numérico/monetário no valor normalizado.
+ _AMOUNT_KEYS = ("amount", "number")
+ 
++#: Campo textual com enum fechado (`enum_base_territorial` da spec / D2-P0-3).
++#: A spec escreve `base_territorial`, mas o campo real do catálogo é
++#: `extensao_territorial` ("base territorial" só aparece em texto de documento).
++_ENUM_FIELD_CODES: frozenset[str] = frozenset({"extensao_territorial"})
++
++#: Tokens canônicos do enum, já em forma normalizada (minúsculas, sem acento).
++#: Aliases do actions.md D2-P0-3: eua/estados unidos e mundo/mundial/worldwide.
++_TERRITORY_ENUM: frozenset[str] = frozenset(
++    {
++        "brasil", "eua", "estados unidos", "canada", "europa",
++        "america latina", "america do sul", "america do norte",
++        "mundo", "mundial", "worldwide", "internacional", "exterior",
++    }
++)
++
++
++def _fold_text(text: str) -> str:
++    """Normalização defensiva, idempotente: minúsculas, sem acento, espaços colapsados."""
++    decomposed = unicodedata.normalize("NFKD", text)
++    unaccented = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
++    return " ".join(unaccented.lower().split())
+```
+
+```diff
++def _rule_enum_base_territorial(field: FieldDefinition, normalized: dict) -> list[RuleViolation]:
++    """Enum fechado da extensão territorial (dispatch por `field.code`, nunca por tipo)."""
++    if field.code not in _ENUM_FIELD_CODES:
++        return []
++    text = str(normalized.get("text", "") or "")
++    if not text.strip():
++        return []  # sem texto legível → sem regra (normalização cuida, EC-04)
++    if _fold_text(text) in _TERRITORY_ENUM:
++        return []
++    # Motivo sanitizado: só regra/campo, nunca o valor (T-2a).
++    return [
++        RuleViolation("enum_base_territorial", field.code, "valor fora do enum de extensão territorial")
++    ]
++
++
+ def validate_fact(...):
+     ...
+     violations += _rule_vigencia_ordem(field, normalized)
++    violations += _rule_enum_base_territorial(field, normalized)
+     return violations
+```
+
+(docstring do módulo atualizado com a nova regra.)
+
+Decisões registradas (debate, resposta-final):
+- Semântica: igualdade EXATA do token normalizado (nunca substring); "Global" e compostos
+  ("Estados Unidos e Canadá") ficam fora do enum e rebaixam como sinal de revisão;
+  ampliação de aliases só por adendo, nunca por token improvisado no código.
+- Rebaixamento: `FOUND` → `NEEDS_REVIEW` + `requires_human_review=True` +
+  `value["rule_violations"]`; `NOT_FOUND`/`None`/texto vazio (EC-04) não recebem regra.
+- Consumidores inalterados: fixtures ("Mundial", "Brasil"), golden set ("Mundo", "Canadá",
+  "Estados Unidos"), comparação (valor cru até decisão humana) e export (já previsto o
+  `rule_violations` no contrato v1.0.0).

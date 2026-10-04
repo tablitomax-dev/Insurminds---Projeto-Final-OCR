@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grafo de Bugs · policy-analysis</title>
+<style>
+  :root { color-scheme: dark; }
+  body { background: #14161a; color: #e6e6e6; font-family: system-ui, sans-serif; margin: 0; padding: 24px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 16px; margin: 28px 0 10px; }
+  .meta { color: #9aa0a6; font-size: 12px; margin-bottom: 18px; }
+  .cards { display: flex; flex-wrap: wrap; gap: 12px; }
+  .card { background: #1d2025; border: 1px solid #2c2f35; border-radius: 8px; padding: 12px 16px; min-width: 120px; }
+  .card .n { font-size: 22px; font-weight: 700; }
+  .card .l { color: #9aa0a6; font-size: 12px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { border: 1px solid #2c2f35; padding: 6px 10px; text-align: left; }
+  th { background: #1d2025; }
+  a { color: #7fb4ff; text-decoration: none; }
+  .ok { color: #6fdc8c; } .warn { color: #f2c94c; } .bad { color: #ff6b6b; }
+  .legend { color: #9aa0a6; font-size: 12px; margin-top: 10px; }
+  svg { background: #1d2025; border: 1px solid #2c2f35; border-radius: 8px; width: 100%; max-width: 860px; }
+  .node { fill: #23262c; }
+  .t1 { fill: #e6e6e6; font-size: 13px; font-weight: 600; }
+  .t2 { fill: #b8bdc4; font-size: 11px; }
+  .t3 { fill: #9aa0a6; font-size: 11px; }
+</style>
+</head>
+<body>
+<h1>Grafo de Bugs · policy-analysis</h1>
+<div class="meta">Gerado por /reversa-debugger-graph em 2026-10-04T11:45:00-03:00 · 3 bugs · 0 inconsistências · legenda: arestas tracejadas = relação proposed (hipótese)</div>
+
+<div class="cards">
+  <div class="card"><div class="n">3</div><div class="l">total de bugs</div></div>
+  <div class="card"><div class="n ok">3</div><div class="l">resolved · fixed</div></div>
+  <div class="card"><div class="n ok">0</div><div class="l">abertos/ativos</div></div>
+  <div class="card"><div class="n">0</div><div class="l">adendos de spec gerados</div></div>
+  <div class="card"><div class="n">0</div><div class="l">inconsistências</div></div>
+</div>
+
+<h2>Grafo</h2>
+<svg viewBox="0 0 860 320" role="img" aria-label="Grafo de relações entre bugs">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#9aa0a6"></polygon>
+    </marker>
+  </defs>
+
+  <!-- aresta: KD2H -related-to(proposed)-> ODCS -->
+  <line x1="420" y1="120" x2="590" y2="120" stroke="#9aa0a6" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow)"></line>
+  <text x="470" y="108" class="t3">related-to (proposed)</text>
+
+  <a href="../bugs/BUG-20261004-KD2H-review-sem-validate-fact/bug.md">
+    <g transform="translate(60,70)">
+      <rect class="node" width="360" height="100" rx="10" stroke="#6fdc8c" stroke-width="2"></rect>
+      <text x="16" y="28" class="t1">#3 BUG-20261004-KD2H · review sem validate_fact</text>
+      <text x="16" y="50" class="t2">Notas do D2-P0-2 afirmam validate_fact na correção humana</text>
+      <text x="16" y="70" class="t3">severity low · area policy-analysis</text>
+      <text x="16" y="88" class="ok">resolved · fixed</text>
+    </g>
+  </a>
+
+  <a href="../bugs/BUG-20261004-ODCS-enum-base-territorial-ausente/bug.md">
+    <g transform="translate(590,70)">
+      <rect class="node" width="220" height="100" rx="10" stroke="#f2c94c" stroke-width="2"></rect>
+      <text x="16" y="28" class="t1">#2 BUG-20261004-ODCS · enum ausente</text>
+      <text x="16" y="50" class="t2">enum_base_territorial ausente</text>
+      <text x="16" y="70" class="t3">severity medium · policy-analysis</text>
+      <text x="16" y="88" class="ok">resolved · fixed</text>
+    </g>
+  </a>
+
+  <a href="../bugs/BUG-20261004-YFN3-erro-extracao-vaza-texto/bug.md">
+    <g transform="translate(590,195)">
+      <rect class="node" width="220" height="100" rx="10" stroke="#f2c94c" stroke-width="2"></rect>
+      <text x="16" y="28" class="t1">#1 BUG-20261004-YFN3 · vazamento T-2a</text>
+      <text x="16" y="50" class="t2">ValidationError cru vaza texto de apólice</text>
+      <text x="16" y="70" class="t3">severity medium · policy-analysis</text>
+      <text x="16" y="88" class="ok">resolved · fixed</text>
+    </g>
+  </a>
+</svg>
+<div class="legend">História do grafo: os 3 bugs convergiram em <code>src/modules/policy_analysis</code> e no padrão de
+registro de execução otimista da feature dev2-003 (declarou execuções que o código não tinha).
+Todos corrigidos e travados em 2026-10-04, cada um com veredito <code>spec-correta</code>. A aresta
+tracejada (#3 → #2) é a única relação, mantida como hipótese (proposed); o padrão ficou
+documentado em <code>_reversa_forward/dev2-003-p0-analise-experiencia/registro-correcoes-20261004.md</code>.</div>
+
+<h2>Bugs abertos / ativos</h2>
+<p class="legend">Nenhum.</p>
+
+<h2>Concluídos (travados)</h2>
+<table>
+  <tr><th>#</th><th>ID</th><th>Trava</th><th>resolution_kind</th><th>Veredito de spec</th><th>Título</th></tr>
+  <tr>
+    <td>1</td>
+    <td><a href="../bugs/BUG-20261004-YFN3-erro-extracao-vaza-texto/bug.md">BUG-20261004-YFN3</a></td>
+    <td>2026-10-04</td><td>fixed</td><td>spec-correta</td>
+    <td>Erro de validação na extração interpola ValidationError cru e vaza texto de apólice</td>
+  </tr>
+  <tr>
+    <td>2</td>
+    <td><a href="../bugs/BUG-20261004-ODCS-enum-base-territorial-ausente/bug.md">BUG-20261004-ODCS</a></td>
+    <td>2026-10-04</td><td>fixed</td><td>spec-correta</td>
+    <td>Regra enum_base_territorial ausente, extensao_territorial fora do enum passa como FOUND</td>
+  </tr>
+  <tr>
+    <td>3</td>
+    <td><a href="../bugs/BUG-20261004-KD2H-review-sem-validate-fact/bug.md">BUG-20261004-KD2H</a></td>
+    <td>2026-10-04</td><td>fixed</td><td>spec-correta</td>
+    <td>Notas do D2-P0-2 afirmam validate_fact na correção humana, mas review.py não chama</td>
+  </tr>
+</table>
+</body>
+</html>

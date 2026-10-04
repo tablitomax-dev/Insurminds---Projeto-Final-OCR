@@ -1,0 +1,13 @@
+Trecho do docstring de src/modules/policy_analysis/domain/rules.py ("Regras implementadas
+sobre o catalogo vigente"):
+
+- `valor_positivo` — campos monetarios/numericos com escalar > 0 (a `franquia`
+  aceita 0, pois "sem franquia" e valido).
+- `moeda_conhecida` — moeda monetaria declarada em um conjunto ISO usual D&O.
+- `moeda_consistente` — campos monetarios da mesma apolice com a mesma moeda
+  (regra cruzada: recebe os demais valores monetarios da apolice).
+- `vigencia_ordem` — `vigencia.inicio <= vigencia.fim` (regra cruzada; cobre
+  valores montados fora da normalizacao).
+
+Nao ha `enum_base_territorial` nem qualquer checagem de enum para o campo
+`extensao_territorial` (FieldType.TEXT em domain/field_catalog.py).

@@ -1,0 +1,20 @@
+# CHG-005 (BUG-20261004-KD2H) — test: guarda de regras no CORRIGIDO
+
+Arquivo: tests/modules/policy_analysis/test_review_queue.py
+
+```diff
+ from modules.policy_analysis.infrastructure.llm_agent import FixtureExtractionAgent
++from shared_kernel.errors import ContractValidationError
+```
+
+Novos testes (após `test_decisao_corrigido_substitui_valor_e_normaliza`):
+- `test_corrigido_com_valor_que_viola_regra_e_rejeitado_sem_persistir` — CORRIGIDO com
+  `{"number": "-3"}` levanta `ContractValidationError` com `valor_positivo` na mensagem,
+  sem eco do valor ("-3" fora, T-2a); nada persistido (fato segue na fila, sem decisão).
+- `test_corrigido_com_moeda_invalida_tambem_e_rejeitado` — CORRIGIDO em campo monetário
+  (`limite_agregado`) com `currency: "XYZ"` levanta `ContractValidationError` com
+  `moeda_conhecida`, sem "XYZ" na mensagem.
+- `test_confirm_nao_recebe_regras` — rejeição do CORRIGIDO não bloqueia; `CONFIRMADO`
+  seguido aceita e sai da fila (revisor é autoridade final, sem regras).
+
+Prova: vermelho antes (todos com "DID NOT RAISE"), verde depois.

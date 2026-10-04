@@ -11,9 +11,11 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from shared_kernel.contracts import ExtractedFact
+from shared_kernel.errors import ContractValidationError
 
 from ..domain.field_catalog import get_field
 from ..domain.models import ReviewItem
+from ..domain.rules import validate_fact
 from ..domain.value_types import normalize_value, raw_value_from_text
 
 
@@ -66,6 +68,15 @@ class ReviewService:
                 value = raw_value_from_text(field, value, original=item.fact.value)
             new_value = value
             new_normalized = normalize_value(field, value)
+            # D2-P0-2: correção humana passa pelas regras do campo como guarda
+            # contra erro de digitação; violação rejeita a decisão e NADA é
+            # persistido. Motivo sanitizado: só regra/campo, nunca o valor (T-2a).
+            violations = validate_fact(field, new_normalized)
+            if violations:
+                rules = ", ".join(v.rule for v in violations)
+                raise ContractValidationError(
+                    f"correção rejeitada pelas regras do campo {item.fact.field_code}: {rules}"
+                )
 
         revisado_em = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         if decision == "DIVERGENTE":

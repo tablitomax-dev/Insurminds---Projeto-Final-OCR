@@ -1,0 +1,13 @@
+Trecho de _reversa_sdd/addenda/dev2-003-p0-analise-experiencia.md (linha da tabela do
+$6.1 Requisitos Funcionais) afirmando a regra como implementada:
+
+> Guardas pos-LLM implementadas: citacao precisa ser substring literal do chunk citado
+> (OQ-02 decidida: substring), `temperature=0`, erros sanitizados; regras por campo
+> (`vigencia_ordem`, `valor_positivo`, moedas, `enum_base_territorial`) rebaixam fato
+> invalido para `NEEDS_REVIEW`
+
+E a definicao do enum em _reversa_forward/dev2-003-p0-analise-experiencia/actions.md (D2-P0-3):
+
+> `enum_base_territorial` — `base_territorial` ∈ enum fechado (brasil, eua/estados unidos,
+> canada, europa, america latina, america do sul, america do norte, mundo/mundial/worldwide,
+> internacional, exterior);

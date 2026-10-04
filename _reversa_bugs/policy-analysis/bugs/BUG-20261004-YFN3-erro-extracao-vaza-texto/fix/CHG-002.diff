@@ -1,0 +1,26 @@
+# CHG-002 (BUG-20261004-YFN3) — code: sanitização T-2a da mensagem + from None
+
+Arquivo: src/modules/policy_analysis/application/extraction.py
+
+```diff
+         except ValidationError as exc:
++            # T-2a: nunca str(exc)/errors() — o input do Pydantic ecoa texto de
++            # apólice. Só tipo + quantidade + campo; `from None` corta a cadeia
++            # que renderizava o ValidationError cru em traceback/log.
+             raise ClassifiedError(
+                 "LLM_SCHEMA_INVALID",
+-                f"saída do LLM fora do contrato em {req.field_code}: {exc}",
++                f"saída do LLM fora do contrato em {req.field_code}: "
++                f"{type(exc).__name__} com {len(exc.errors())} problema(s) de schema",
+                 retriable=True,
+-            ) from exc
++            ) from None
+```
+
+Decisões registradas (debate, resposta-final):
+- Mensagem minimalista no padrão T-2a canônico do projeto (`_cause` do document_processing:
+  "NUNCA `str(exc)`", só tipo; `_with_retries` do llm_agent: tipo + contagem).
+- `from None` suprime o `__context__` na renderização de traceback/log; o residual apontado por
+  introspecção permanece (plano B documentado: levantar fora do bloco `except`, não executado).
+- Escopo cirúrgico: somente este `except`; os ecos residuais em `llm_agent.py:267` e
+  `document_processing_source.py:30` ficam como follow-up próprio, fora do change_set.

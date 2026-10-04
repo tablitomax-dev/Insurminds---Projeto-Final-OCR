@@ -1,0 +1,5 @@
+Trecho de _reversa_forward/dev2-003-p0-analise-experiencia/actions.md (registro da feature,
+secao D2-P0-2/T-2a) que descarta exatamente o que o codigo atual faz:
+
+> Alternativa descartada: manter `str(exc)`/`exc.errors()[...]["msg"]` (ambos podem conter o input);
+> nada de UI aqui — `st.error` fica para a parte 2.

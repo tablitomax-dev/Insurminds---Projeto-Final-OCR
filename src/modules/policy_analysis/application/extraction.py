@@ -133,11 +133,15 @@ class ExtractionService:
                 }
             )
         except ValidationError as exc:
+            # T-2a: nunca str(exc)/errors() — o input do Pydantic ecoa texto de
+            # apólice. Só tipo + quantidade + campo; `from None` corta a cadeia
+            # que renderizava o ValidationError cru em traceback/log.
             raise ClassifiedError(
                 "LLM_SCHEMA_INVALID",
-                f"saída do LLM fora do contrato em {req.field_code}: {exc}",
+                f"saída do LLM fora do contrato em {req.field_code}: "
+                f"{type(exc).__name__} com {len(exc.errors())} problema(s) de schema",
                 retriable=True,
-            ) from exc
+            ) from None
         return fact
 
     def _apply_field_guards(

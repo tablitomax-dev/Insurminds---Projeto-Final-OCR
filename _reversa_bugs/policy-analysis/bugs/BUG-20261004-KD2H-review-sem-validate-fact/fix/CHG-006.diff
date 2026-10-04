@@ -1,0 +1,42 @@
+# CHG-006 (BUG-20261004-KD2H) — code: validate_fact no ramo CORRIGIDO de record_decision
+
+Arquivo: src/modules/policy_analysis/application/review.py
+
+```diff
+ from shared_kernel.contracts import ExtractedFact
++from shared_kernel.errors import ContractValidationError
+ 
+ from ..domain.field_catalog import get_field
+ from ..domain.models import ReviewItem
++from ..domain.rules import validate_fact
+ from ..domain.value_types import normalize_value, raw_value_from_text
+```
+
+```diff
+             if isinstance(value, str):
+                 value = raw_value_from_text(field, value, original=item.fact.value)
+             new_value = value
+             new_normalized = normalize_value(field, value)
++            # D2-P0-2: correção humana passa pelas regras do campo como guarda
++            # contra erro de digitação; violação rejeita a decisão e NADA é
++            # persistido. Motivo sanitizado: só regra/campo, nunca o valor (T-2a).
++            violations = validate_fact(field, new_normalized)
++            if violations:
++                rules = ", ".join(v.rule for v in violations)
++                raise ContractValidationError(
++                    f"correção rejeitada pelas regras do campo {item.fact.field_code}: {rules}"
++                )
+```
+
+Decisões registradas (usuário, 2026-10-04):
+- Semântica: guarda em `CORRIGIDO` conforme a nota do D2-P0-2; violação levanta
+  `ContractValidationError` sanitizado e nada é persistido; `CONFIRMADO` segue sem regras
+  (revisor é autoridade final).
+- Veredito de spec: `spec-correta` (a nota da spec estava certa; era o código que não tinha
+  a guarda) — decisão humana de 2026-10-04, na mesma deliberação da semântica.
+- Regras avaliadas: do próprio campo (`validate_fact` sem valores cruzados); regras
+  monetárias seguem só para campos MONEY (comportamento do `validate_fact` inalterado).
+- Correções de registro documentais do debate (adendo §6.1, "Regras implementadas",
+  mapeamento `base_territorial` × `extensao_territorial`) ficam em documento próprio
+  (`_reversa_forward/dev2-003-p0-analise-experiencia/registro-correcoes-20261004.md`),
+  fora do change_set deste fix.
