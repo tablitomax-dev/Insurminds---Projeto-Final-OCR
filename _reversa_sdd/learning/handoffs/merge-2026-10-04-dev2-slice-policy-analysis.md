@@ -24,10 +24,12 @@ Commits trazidos do Dev 2 (5 de conteúdo):
   `field.code`, `_fold_text` e motivo sanitizado T-2a. A duplicata do Dev 2
   (`KNOWN_TERRITORY_BASES`, versão com `normalize_text`) foi descartada — vocabulários
   idênticos (13 tokens), comportamento equivalente.
-- `tests/modules/policy_analysis/test_rules.py` — auto-merge ok; removido o bloco de
-  testes antigo do Dev 2 (3 testes, incluindo `test_enum_base_territorial_rejeita_fora_do_enum`
-  homônimo) que colidia com o bloco parametrizado do BUG-20261004-ODCS (ruff F811).
-  Casos cobertos pelo bloco novo (parametrizado, mais amplo) + `test_enum_territorial_violado_rebaixa_found_para_needs_review`.
+- `tests/modules/policy_analysis/test_rules.py` — auto-merge ok; os dois blocos de
+  testes de enum são preservados integralmente (Dev 2 + BUG-20261004-ODCS). A única
+  adequação: renomeado o teste homônimo **do bloco mais recente** (nosso, parametrizado)
+  para `test_enum_base_territorial_rejeita_compostos_fora_do_enum`, mantendo intactas as
+  linhas do Dev 2 (`test_enum_base_territorial_rejeita_fora_do_enum` e demais) — o ruff
+  F811 impedia a coexistência dos nomes idênticos.
 - Demais 21 arquivos do Dev 2 entraram sem conflito (UI, adapters, docs, `pyproject.toml`).
 
 ## 3. Funcionalidades integradas
@@ -44,9 +46,9 @@ Commits trazidos do Dev 2 (5 de conteúdo):
 - Regra aplicada: **manter o arquivo mais recente** (decisão do usuário) — datas
   confirmadas via `git log -1 -- <arquivo>` por lado.
 - Conflito único: `rules.py` (2 hunks: docstring + função do enum) → `git checkout --ours`
-  (lado do `main`, mais novo) + limpeza da duplicata no `test_rules.py`.
-- Testes de ambos os lados preservados e verificados contra a implementação mantida;
-  nenhum assert de texto de motivo divergente entre as versões.
+  (lado do `main`, mais novo) + remoção da duplicata `KNOWN_TERRITORY_BASES` vinda do Dev 2.
+- Testes de ambos os lados preservados; em `test_rules.py`, o homônimo colidente
+  (ruff F811) foi renomeado no bloco mais recente (nosso) para não tocar nas linhas do Dev 2.
 
 ## 5. Zonas compartilhadas
 
@@ -62,4 +64,5 @@ Commits trazidos do Dev 2 (5 de conteúdo):
 
 - `ruff check src tests` — All checks passed.
 - `mypy src` — Success: no issues found in 69 source files.
-- `pytest -q` — **368 passed, 4 skipped** (inclui testes novos de UI: `test_query.py`, `test_value_format.py`).
+- `pytest -q` — **371 passed, 4 skipped** (inclui testes novos de UI: `test_query.py`, `test_value_format.py`
+  e os 3 testes de enum do Dev 2 preservados em `test_rules.py`).
