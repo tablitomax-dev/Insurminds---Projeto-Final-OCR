@@ -9,6 +9,7 @@ from modules.policy_analysis.application.review import ReviewService
 from modules.policy_analysis.infrastructure.duckdb_repository import PolicyAnalysisRepository
 from modules.policy_analysis.infrastructure.evidence_source import MockEvidenceSource
 from modules.policy_analysis.infrastructure.llm_agent import FixtureExtractionAgent
+from shared_kernel.errors import ContractValidationError
 
 ALL_CODES = [
     "limite_agregado",
@@ -75,6 +76,66 @@ def test_decisao_corrigido_substitui_valor_e_normaliza(fixture_a, evidences_a):
     assert updated.normalized_value == {"number": "5"}
     assert updated.status == "FOUND"
     assert updated.requires_human_review is False
+
+
+def test_corrigido_com_valor_que_viola_regra_e_rejeitado_sem_persistir(fixture_a, evidences_a):
+    """Guarda D2-P0-2 (BUG-20261004-KD2H): CORRIGIDO passa pelas regras do campo."""
+    repo, extraction, review = build(fixture_a, evidences_a)
+    extraction.extract_fields("POL-A", ALL_CODES)
+
+    with pytest.raises(ContractValidationError) as excinfo:
+        review.record_decision(
+            "FAC-POL-A-indice_reajuste",
+            decision="CORRIGIDO",
+            decided_by="analista@insurminds",
+            value={"number": "-3", "unit": "%"},  # viola valor_positivo
+        )
+
+    # Motivo sanitizado (T-2a): só regra/campo, nunca o valor.
+    assert "valor_positivo" in str(excinfo.value)
+    assert "-3" not in str(excinfo.value)
+    # Nada é persistido: o fato segue na fila, sem decisão registrada.
+    pending = review.list_pending("POL-A")
+    assert [item.fact.fact_id for item in pending] == ["FAC-POL-A-indice_reajuste"]
+    assert pending[0].revisao_decisao is None
+
+
+def test_corrigido_com_moeda_invalida_tambem_e_rejeitado(fixture_a, evidences_a):
+    repo, extraction, review = build(fixture_a, evidences_a)
+    extraction.extract_fields("POL-A", ALL_CODES)
+
+    # Campo monetário: moeda fora do conjunto conhecido viola `moeda_conhecida`.
+    with pytest.raises(ContractValidationError) as excinfo:
+        review.record_decision(
+            "FAC-POL-A-limite_agregado",
+            decision="CORRIGIDO",
+            decided_by="analista@insurminds",
+            value={"amount": "100.00", "currency": "XYZ"},
+        )
+    assert "moeda_conhecida" in str(excinfo.value)
+    assert "XYZ" not in str(excinfo.value)  # motivo sanitizado (T-2a)
+
+
+def test_confirm_nao_recebe_regras(fixture_a, evidences_a):
+    """`confirm` é autoridade final: não roda regras (semântica D2-P0-2)."""
+    repo, extraction, review = build(fixture_a, evidences_a)
+    extraction.extract_fields("POL-A", ALL_CODES)
+
+    with pytest.raises(ContractValidationError):
+        review.record_decision(
+            "FAC-POL-A-indice_reajuste",
+            decision="CORRIGIDO",
+            decided_by="analista@insurminds",
+            value={"number": "-3", "unit": "%"},
+        )
+
+    updated = review.record_decision(
+        "FAC-POL-A-indice_reajuste",
+        decision="CONFIRMADO",
+        decided_by="analista@insurminds",
+    )
+    assert updated.status == "FOUND"
+    assert review.list_pending("POL-A") == []
 
 
 def test_corrigido_sem_valor_e_invalido(fixture_a, evidences_a):

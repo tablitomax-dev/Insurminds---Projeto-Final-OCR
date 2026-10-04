@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import traceback
+
 import pytest
 
-from modules.policy_analysis.application.errors import ClassifiedError
+from modules.policy_analysis.application.errors import ClassifiedError, to_processing_status
 from modules.policy_analysis.application.extraction import ExtractionService
 from modules.policy_analysis.infrastructure.evidence_source import MockEvidenceSource
 from modules.policy_analysis.infrastructure.llm_agent import (
@@ -131,6 +133,46 @@ def test_saida_fora_do_schema_nunca_vira_fato(fixture_a, evidences_a):
         service.extract_fields("POL-A", ["franquia"])
     assert exc.value.code == "LLM_SCHEMA_INVALID"
     assert repo.get_facts("POL-A") == []
+
+
+#: Marcador de texto de apólice: nunca pode vazar em erro classificado (T-2a).
+APOLICE_MARKER = "TEXTO-CONFIDENCIAL-APOLICE-XYZ"
+
+
+def test_erro_de_schema_nao_ecoa_texto_de_apolice(fixture_a, evidences_a):
+    """Reprodução/anti-vazamento BUG-20261004-YFN3 (T-2a)."""
+    raw = [
+        {
+            "field_code": "franquia",
+            "status": "FOUND",
+            "value": {"amount": "50000.00", "currency": "BRL"},
+            "confidence": APOLICE_MARKER,
+            "evidence_ids": ["EV-A-003"],
+            "requires_human_review": False,
+        }
+    ]
+    repo = _memory_repo()
+    service = ExtractionService(MockEvidenceSource({"POL-A": evidences_a}), StubAgent(raw), repo)
+
+    with pytest.raises(ClassifiedError) as excinfo:
+        service.extract_fields("POL-A", ["franquia"])
+
+    error = excinfo.value
+    assert error.code == "LLM_SCHEMA_INVALID"
+    assert error.retriable is True
+    # Diagnóstico permitido (padrão T-2a do projeto): campo + tipo + contagem.
+    assert "franquia" in error.message
+    assert "ValidationError" in error.message
+    assert "1 problema" in error.message
+    # Anti-vazamento: o marcador não chega a NENHUMA superfície de renderização.
+    assert APOLICE_MARKER not in str(error)
+    assert APOLICE_MARKER not in repr(error)
+    assert APOLICE_MARKER not in error.to_dict()["message"]
+    assert APOLICE_MARKER not in to_processing_status("DOC-1", error).message
+    assert APOLICE_MARKER not in "".join(traceback.format_exception(error))
+    # Guarda mecanística da decisão `from None` (política T-2a): falha se alguém
+    # voltar a `from exc` mantendo a mensagem limpa.
+    assert error.__cause__ is None and error.__suppress_context__
 
 
 def test_retry_com_backoff_diante_de_falha_temporaria():

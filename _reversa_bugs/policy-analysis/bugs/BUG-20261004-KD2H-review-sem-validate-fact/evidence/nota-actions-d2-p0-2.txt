@@ -1,0 +1,20 @@
+1) NOTA REGISTRADA (spec efetiva), _reversa_forward/dev2-003-p0-analise-experiencia/actions.md
+   (D2-P0-2, linha 135):
+
+> Correção humana passa pelas regras do campo (`validate_fact`) como guarda contra erro de
+> digitação: violação -> `ContractValidationError` sanitizado (só regra/campo, nunca o valor) e
+> nada é persistido. `confirm` **não** recebe regras — o revisor é a autoridade final sobre o
+> valor documentado (é para isso que a fila existe).
+
+2) CÓDIGO REAL, src/modules/policy_analysis/application/review.py (record_decision):
+
+            if value is None:
+                raise ValueError("decisão CORRIGIDO exige value")
+            field = get_field(item.fact.field_code)
+            if isinstance(value, str):
+                value = raw_value_from_text(field, value, original=item.fact.value)
+            new_value = value
+            new_normalized = normalize_value(field, value)
+
+Grep de `validate_fact` em src/modules/policy_analysis/application/review.py (2026-10-04):
+zero ocorrências. Nenhuma regra de campo é avaliada na correção humana.

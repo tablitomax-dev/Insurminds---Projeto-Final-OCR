@@ -1,0 +1,6 @@
+except ValidationError as exc:
+    raise ClassifiedError(
+        "LLM_SCHEMA_INVALID",
+        f"saída do LLM fora do contrato em {req.field_code}: {exc}",
+        retriable=True,
+    ) from exc

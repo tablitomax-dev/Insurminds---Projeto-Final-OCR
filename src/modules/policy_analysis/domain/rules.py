@@ -12,12 +12,16 @@ Regras implementadas sobre o catálogo vigente (`field_catalog`):
   (regra cruzada: recebe os demais valores monetários da apólice).
 - `vigencia_ordem` — `vigencia.inicio <= vigencia.fim` (regra cruzada; cobre
   valores montados fora da normalização).
+- `enum_base_territorial` — enum fechado da extensão territorial (D2-P0-3);
+  dispatch por `field.code == "extensao_territorial"` (o nome da regra vem da
+  spec, que escreve `base_territorial`).
 
 Motivos citam apenas regra/campo — nunca o valor (T-2a).
 """
 
 from __future__ import annotations
 
+import unicodedata
 from dataclasses import dataclass
 
 from .field_catalog import FieldDefinition, FieldType
@@ -40,6 +44,38 @@ _POSITIVE_CODES: frozenset[str] = frozenset(
 
 #: Chaves de escalar numérico/monetário no valor normalizado.
 _AMOUNT_KEYS = ("amount", "number")
+
+#: Campo textual com enum fechado (`enum_base_territorial` da spec / D2-P0-3).
+#: A spec escreve `base_territorial`, mas o campo real do catálogo é
+#: `extensao_territorial` ("base territorial" só aparece em texto de documento).
+_ENUM_FIELD_CODES: frozenset[str] = frozenset({"extensao_territorial"})
+
+#: Tokens canônicos do enum, já em forma normalizada (minúsculas, sem acento).
+#: Aliases do actions.md D2-P0-3: eua/estados unidos e mundo/mundial/worldwide.
+_TERRITORY_ENUM: frozenset[str] = frozenset(
+    {
+        "brasil",
+        "eua",
+        "estados unidos",
+        "canada",
+        "europa",
+        "america latina",
+        "america do sul",
+        "america do norte",
+        "mundo",
+        "mundial",
+        "worldwide",
+        "internacional",
+        "exterior",
+    }
+)
+
+
+def _fold_text(text: str) -> str:
+    """Normalização defensiva, idempotente: minúsculas, sem acento, espaços colapsados."""
+    decomposed = unicodedata.normalize("NFKD", text)
+    unaccented = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+    return " ".join(unaccented.lower().split())
 
 
 @dataclass(frozen=True)
@@ -134,6 +170,21 @@ def _rule_vigencia_ordem(field: FieldDefinition, normalized: dict) -> list[RuleV
     return []
 
 
+def _rule_enum_base_territorial(field: FieldDefinition, normalized: dict) -> list[RuleViolation]:
+    """Enum fechado da extensão territorial (dispatch por `field.code`, nunca por tipo)."""
+    if field.code not in _ENUM_FIELD_CODES:
+        return []
+    text = str(normalized.get("text", "") or "")
+    if not text.strip():
+        return []  # sem texto legível → sem regra (normalização cuida, EC-04)
+    if _fold_text(text) in _TERRITORY_ENUM:
+        return []
+    # Motivo sanitizado: só regra/campo, nunca o valor (T-2a).
+    return [
+        RuleViolation("enum_base_territorial", field.code, "valor fora do enum de extensão territorial")
+    ]
+
+
 def validate_fact(
     field: FieldDefinition,
     normalized: dict | None,
@@ -152,4 +203,5 @@ def validate_fact(
     violations += _rule_moeda_conhecida(field, normalized)
     violations += _rule_moeda_consistente(field, normalized, other_money_values)
     violations += _rule_vigencia_ordem(field, normalized)
+    violations += _rule_enum_base_territorial(field, normalized)
     return violations

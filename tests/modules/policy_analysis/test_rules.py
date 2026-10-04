@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from modules.policy_analysis.application.extraction import ExtractionService
 from modules.policy_analysis.domain.field_catalog import get_field
 from modules.policy_analysis.domain.rules import validate_fact
@@ -75,6 +77,53 @@ def test_texto_nao_recebe_regras_de_valor():
 
 def test_valor_none_nao_dispara_regra():
     assert validate_fact(get_field("limite_agregado"), None) == []
+
+
+# --- enum_base_territorial (BUG-20261004-ODCS, D2-P0-3) ----------------------
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Mundial", "MUNDIAL", "mundial", "Brasil", "Canadá", "america latina",
+        "América do Sul", "América do Norte", "eua", "Estados Unidos", "Europa",
+        "Worldwide", "Internacional", "Exterior",
+    ],
+)
+def test_enum_base_territorial_aceita_valores_do_enum(text):
+    assert _violations("extensao_territorial", {"text": text}) == []
+
+
+@pytest.mark.parametrize(
+    "text", ["Atlântico Norte", "Global", "mundial exceto brasil", "Estados Unidos e Canadá"]
+)
+def test_enum_base_territorial_rejeita_fora_do_enum(text):
+    v = _violations("extensao_territorial", {"text": text})
+    assert [x.rule for x in v] == ["enum_base_territorial"]
+
+
+def test_enum_base_territorial_motivo_nunca_traz_o_valor():
+    v = _violations("extensao_territorial", {"text": "Atlântico Norte"})
+    assert "Atlântico" not in v[0].reason
+
+
+def test_enum_nao_alcanca_texto_livre_de_exclusoes():
+    assert _violations("exclusoes_chave", {"text": "Global"}) == []
+
+
+def test_enum_rebaixa_found_para_needs_review_no_servico(evidences_a):
+    raw = [_fact_raw("extensao_territorial", {"text": "Atlântico Norte"}, "EV-A-006")]
+    fact = _service(raw, evidences_a).extract_fields("POL-A", ["extensao_territorial"])[0]
+    assert fact.status == "NEEDS_REVIEW"
+    assert fact.requires_human_review is True
+    assert [v["rule"] for v in fact.value["rule_violations"]] == ["enum_base_territorial"]
+
+
+def test_enum_valido_mantem_found_no_servico(evidences_a):
+    raw = [_fact_raw("extensao_territorial", {"text": "Mundial"}, "EV-A-006")]
+    fact = _service(raw, evidences_a).extract_fields("POL-A", ["extensao_territorial"])[0]
+    assert fact.status == "FOUND"
+    assert fact.requires_human_review is False
 
 
 def test_motivo_da_regra_nunca_traz_o_valor():
