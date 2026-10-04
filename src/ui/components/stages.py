@@ -49,22 +49,55 @@ def render_extraction(
     fields: list[dict[str, str]],
     field_labels: dict[str, str],
 ) -> None:
-    """Estágio de extração de campo das duas apólices."""
-    st.header("2. Extrair campo")
-    field_code = st.selectbox(
-        "Campo do catálogo",
-        [field["code"] for field in fields],
-        format_func=lambda code: field_labels.get(code, code),
-    )
-    if not st.button("Extrair das duas apólices"):
+    """Estágio de extração: TODOS os campos das duas apólices em um passo.
+
+    A extração completa persiste os fatos — é o que deixa a comparação
+    determinística pronta (ela consome os fatos das duas apólices).
+    """
+    st.header("2. Extrair campos")
+    codes = [field["code"] for field in fields]
+    if st.button("Extrair todos os campos das duas apólices"):
+        facts_by_policy: dict[str, list] = {}
+        for policy_id in policy_ids:
+            try:
+                facts_by_policy[policy_id] = policy_api.extract_fields(policy_id, codes)
+            except Exception as error:  # noqa: BLE001 — mensagem sanitizada na UI
+                st.error(sanitize_error_message(f"EXTRACAO/{policy_id}", error))
+                facts_by_policy[policy_id] = []
+        # Botão do Streamlit é efêmero: o resultado fica na sessão para
+        # continuar visível enquanto o usuário usa a comparação/revisão.
+        st.session_state["extracted_facts"] = (tuple(policy_ids), facts_by_policy)
+
+    cached = st.session_state.get("extracted_facts")
+    if not cached or cached[0] != tuple(policy_ids):
         return
+    facts_by_policy = cached[1]
+
+    st.success("Campos extraídos — prontos para a comparação determinística.")
+    st.dataframe(
+        [
+            {
+                "campo": field_labels.get(code, code),
+                **{
+                    policy_id: next(
+                        (
+                            fact.status
+                            for fact in facts_by_policy.get(policy_id, [])
+                            if fact.field_code == code
+                        ),
+                        "—",
+                    )
+                    for policy_id in policy_ids
+                },
+            }
+            for code in codes
+        ],
+        hide_index=True,
+    )
     for policy_id in policy_ids:
-        try:
-            fact = policy_api.extract_field(policy_id, field_code)
-        except Exception as error:  # noqa: BLE001 — mensagem sanitizada na UI
-            st.error(sanitize_error_message(f"EXTRACAO/{policy_id}/{field_code}", error))
-            continue
-        st.subheader(f"{policy_id} · {field_code} · {fact.status}")
-        st.json(fact.model_dump())
-        for evidence_id in fact.evidence_ids:
-            st.caption(f"evidência: {evidence_id}")
+        for fact in facts_by_policy.get(policy_id, []):
+            label = field_labels.get(fact.field_code, fact.field_code)
+            with st.expander(f"{policy_id} · {label} · {fact.status}"):
+                st.json(fact.model_dump())
+                for evidence_id in fact.evidence_ids:
+                    st.caption(f"evidência: {evidence_id}")

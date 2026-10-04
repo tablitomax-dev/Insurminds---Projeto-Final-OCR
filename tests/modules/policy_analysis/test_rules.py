@@ -75,6 +75,21 @@ def test_texto_nao_recebe_regras_de_valor():
     assert v == []
 
 
+def test_enum_base_territorial_aceita_vocabulario():
+    for text in ("Mundo", "Estados Unidos", "Worldwide", "BRASIL", "América do Norte"):
+        assert _violations("extensao_territorial", {"text": text}) == []
+
+
+def test_enum_base_territorial_rejeita_fora_do_enum():
+    v = _violations("extensao_territorial", {"text": "Mundo exceto EUA"})
+    assert [x.rule for x in v] == ["enum_base_territorial"]
+
+
+def test_enum_so_se_aplica_a_extensao_territorial():
+    v = _violations("exclusoes_chave", {"text": "texto livre fora de qualquer enum"})
+    assert v == []
+
+
 def test_valor_none_nao_dispara_regra():
     assert validate_fact(get_field("limite_agregado"), None) == []
 
@@ -198,3 +213,13 @@ def test_moeda_consistente_nao_rebaixa_quando_igual(evidences_a):
         "POL-A", ["limite_agregado", "limite_por_sinistro"]
     )
     assert all(f.status == "FOUND" for f in facts)
+
+
+def test_enum_territorial_violado_rebaixa_found_para_needs_review(evidences_a):
+    raw = [
+        _fact_raw("extensao_territorial", {"text": "Mundo exceto EUA"}, "EV-A-001"),
+    ]
+    fact = _service(raw, evidences_a).extract_fields("POL-A", ["extensao_territorial"])[0]
+    assert fact.status == "NEEDS_REVIEW"
+    assert fact.requires_human_review is True
+    assert [v["rule"] for v in fact.value["rule_violations"]] == ["enum_base_territorial"]

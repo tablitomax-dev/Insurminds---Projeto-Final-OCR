@@ -10,7 +10,7 @@ DELETE+INSERT em transação: re-extração e re-comparação nunca duplicam
 from __future__ import annotations
 
 import json
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 
 import duckdb
 
@@ -124,7 +124,7 @@ class PolicyAnalysisRepository:
                 _as_date(policy.get("vigencia_inicio")),
                 _as_date(policy.get("vigencia_fim")),
                 policy.get("fonte_documentos"),
-                datetime.utcnow(),
+                datetime.now(UTC),
             ],
         )
 
@@ -247,7 +247,7 @@ class PolicyAnalysisRepository:
                     _dumps(list(campo.evidencias_a)),
                     _dumps(list(campo.evidencias_b)),
                     campo.explicacao,
-                    datetime.utcnow(),
+                    datetime.now(UTC),
                 ],
             )
 

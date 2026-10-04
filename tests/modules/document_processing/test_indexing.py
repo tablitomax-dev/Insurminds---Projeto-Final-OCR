@@ -70,11 +70,18 @@ def _response_for(texts):
     )
 
 
+class _FakeEmbedContentConfig:
+    def __init__(self, output_dimensionality=None):
+        self.output_dimensionality = output_dimensionality
+
+
 class _FakeGenaiSdk:
     """Subconjunto do SDK `google-genai` usado pelo `GeminiEmbedder`."""
 
     def __init__(self, failures=()):
-        self.types = types.SimpleNamespace(HttpOptions=_FakeHttpOptions)
+        self.types = types.SimpleNamespace(
+            HttpOptions=_FakeHttpOptions, EmbedContentConfig=_FakeEmbedContentConfig
+        )
         self.failures = list(failures)
         self.calls = []
         self.client_init_calls = []
@@ -84,7 +91,7 @@ class _FakeGenaiSdk:
         sdk = self
 
         class _Models:
-            def embed_contents(self, **kwargs):
+            def embed_content(self, **kwargs):
                 sdk.calls.append(kwargs)
                 if sdk.failures:
                     raise sdk.failures.pop(0)
@@ -231,6 +238,8 @@ def test_gemini_makes_one_request_per_batch_not_per_text(indexing):
 
     assert len(sdk.calls) == 1
     assert sdk.calls[0]["contents"] == ["um", "dois", "tres"]
+    # dimensão travada no contrato da config: bate com a coleção do Qdrant
+    assert sdk.calls[0]["config"].output_dimensionality == 8
 
 
 def test_legacy_sdk_also_uses_single_batch_request(indexing):
