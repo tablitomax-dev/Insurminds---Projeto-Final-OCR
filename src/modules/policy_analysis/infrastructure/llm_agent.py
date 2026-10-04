@@ -247,32 +247,48 @@ class FixtureExplanationAgent:
         }
 
 
+def _build_gemini_model(model_name: str, api_key: str) -> Any:
+    """Monta o modelo Gemini conforme a API do pydantic-ai instalado.
+
+    pydantic-ai >= 2 expõe `GoogleModel` + `GoogleProvider`; nas versões antigas,
+    `GeminiModel(model, api_key=...)` (em `models.google` ou `models.gemini`).
+    """
+    try:
+        from pydantic_ai.models.google import GoogleModel  # type: ignore[attr-defined]
+        from pydantic_ai.providers.google import GoogleProvider
+
+        return GoogleModel(model_name, provider=GoogleProvider(api_key=api_key))
+    except ImportError:
+        pass
+    try:
+        from pydantic_ai.models.google import GeminiModel  # type: ignore[attr-defined]
+    except ImportError:  # versões antigas do pydantic-ai
+        from pydantic_ai.models.gemini import GeminiModel  # type: ignore[no-redef]
+    return GeminiModel(model_name, api_key=api_key)
+
+
 class PydanticAIClient:
     """Provedor real (Gemini) via Pydantic AI, com registro de uso (RNF-03)."""
 
-    def __init__(self, model_name: str = "gemini-2.0-flash", api_key: str | None = None):
+    def __init__(self, model_name: str = "gemini-3.8-flash", api_key: str | None = None):
         self._model_name = model_name
         self._api_key = api_key or os.environ.get("GEMINI_API_KEY")
         self.usage: list[dict] = []
 
     def complete_json(self, prompt: str) -> Any:
-        try:
-            from pydantic_ai import Agent
-            try:
-                from pydantic_ai.models.google import GeminiModel  # type: ignore[attr-defined]
-            except ImportError:  # versões antigas do pydantic-ai
-                from pydantic_ai.models.gemini import GeminiModel  # type: ignore[no-redef]
-        except ImportError as exc:
-            raise ClassifiedError(
-                "LLM_CLIENT_UNAVAILABLE", f"pydantic-ai indisponível: {exc}", retriable=False
-            ) from exc
-
         if not self._api_key:
             raise ClassifiedError(
                 "LLM_API_KEY_MISSING", "GEMINI_API_KEY não configurada", retriable=False
             )
 
-        model = GeminiModel(self._model_name, api_key=self._api_key)
+        try:
+            from pydantic_ai import Agent
+
+            model = _build_gemini_model(self._model_name, self._api_key)
+        except ImportError as exc:
+            raise ClassifiedError(
+                "LLM_CLIENT_UNAVAILABLE", f"pydantic-ai indisponível: {exc}", retriable=False
+            ) from exc
         try:
             agent = Agent(model, output_type=dict)
         except TypeError:  # versões antigas do pydantic-ai

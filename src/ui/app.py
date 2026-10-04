@@ -1,8 +1,8 @@
 """Tela Streamlit do analista de apólices D&O (RF-09 do requirements).
 
-Jornada: carregar 2 apólices → acompanhar estágios → extrair campo →
-comparar com evidências → revisão humana (fila por severidade) → exportar,
-com painel de métricas do último run.
+Jornada: carregar 2 apólices → acompanhar estágios → extrair campos →
+consulta livre às evidências → comparar com evidências → revisão humana
+(fila por severidade) → exportar, com painel de métricas do último run.
 
 Uso: `python -B -m streamlit run src/ui/app.py`
 A UI consome exclusivamente as fachadas públicas (RF-10, F-15), montadas no
@@ -21,6 +21,7 @@ from ui.components import (
     render_extraction,
     render_metrics_panel,
     render_processing,
+    render_query,
     render_review,
     render_upload_section,
 )
@@ -56,6 +57,7 @@ uploads_and_policies = render_upload_section()
 _, _, policy_id_a, policy_id_b = uploads_and_policies
 render_processing(document_api, uploads_and_policies)
 render_extraction(policy_api, (policy_id_a, policy_id_b), fields, field_labels)
+render_query(document_api, (policy_id_a, policy_id_b))
 comparison_id = render_comparison(policy_api, policy_id_a, policy_id_b, fields, field_labels)
 if comparison_id:
     render_export(policy_api, comparison_id)

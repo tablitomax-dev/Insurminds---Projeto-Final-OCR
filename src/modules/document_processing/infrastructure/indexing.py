@@ -246,10 +246,14 @@ class GeminiEmbedder:
         started = time.monotonic()
         if self._kind == "genai":
             client = self._ensure_client()
-            response = client.models.embed_contents(
+            # SDK google-genai: `embed_content` (singular) recebe o lote em
+            # `contents`; a dimensionalidade de saída vai em `EmbedContentConfig`.
+            response = client.models.embed_content(
                 model=self._model,
                 contents=batch,
-                output_dimensionality=self._output_dimensionality,
+                config=self._sdk.types.EmbedContentConfig(
+                    output_dimensionality=self._output_dimensionality
+                ),
             )
         else:
             # SDK legado: também em lote — UM `embed_content` por batch (D1-P0-3c).

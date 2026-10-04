@@ -14,7 +14,7 @@ from modules.policy_analysis.public_api import (
 
 def build_facades(
     db_path: str = "exports/policy_analysis.duckdb",
-    model_name: str = "gemini-2.0-flash",
+    model_name: str = "gemini-3.8-flash",
     api_key: str | None = None,
 ) -> tuple[DocumentProcessingFacade, PolicyAnalysisFacade]:
     """Monta as duas fachadas do pipeline na ordem documental → análise.
