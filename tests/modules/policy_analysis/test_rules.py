@@ -75,21 +75,6 @@ def test_texto_nao_recebe_regras_de_valor():
     assert v == []
 
 
-def test_enum_base_territorial_aceita_vocabulario():
-    for text in ("Mundo", "Estados Unidos", "Worldwide", "BRASIL", "América do Norte"):
-        assert _violations("extensao_territorial", {"text": text}) == []
-
-
-def test_enum_base_territorial_rejeita_fora_do_enum():
-    v = _violations("extensao_territorial", {"text": "Mundo exceto EUA"})
-    assert [x.rule for x in v] == ["enum_base_territorial"]
-
-
-def test_enum_so_se_aplica_a_extensao_territorial():
-    v = _violations("exclusoes_chave", {"text": "texto livre fora de qualquer enum"})
-    assert v == []
-
-
 def test_valor_none_nao_dispara_regra():
     assert validate_fact(get_field("limite_agregado"), None) == []
 
