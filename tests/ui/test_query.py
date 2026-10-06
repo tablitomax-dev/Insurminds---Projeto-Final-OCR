@@ -32,16 +32,16 @@ def test_linhas_trazem_colunas_para_o_analista():
             "página": "3",
             "seção": "Cláusula 7 — Limites",
             "trecho": "O limite de responsabilidade é de R$ 2.000.000,00 por sinistro.",
-            "score": "0,95",
+            "similaridade": "0,95",
             "origem": "texto nativo",
         }
     ]
 
 
-def test_score_em_pt_br_com_duas_casas():
+def test_similaridade_em_pt_br_com_duas_casas():
     rows = format_evidence_rows([_evidence(retrieval_score=1.0)])
 
-    assert rows[0]["score"] == "1,00"
+    assert rows[0]["similaridade"] == "1,00"
 
 
 def test_ausencias_viram_traco():
@@ -51,7 +51,7 @@ def test_ausencias_viram_traco():
 
     row = rows[0]
     assert row["seção"] == "—"
-    assert row["score"] == "—"
+    assert row["similaridade"] == "—"
     assert row["origem"] == "OCR (PaddleOCR)"
 
 

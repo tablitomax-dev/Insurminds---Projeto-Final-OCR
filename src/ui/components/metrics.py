@@ -10,7 +10,7 @@ from ui.logic import format_usage_summary
 
 def render_metrics_panel(policy_api: PolicyAnalysisFacade) -> None:
     """Cartão com tokens/custo/latência do último run (RF-03, decisão do clarify)."""
-    st.subheader("Métricas de uso do último run")
+    st.subheader("Métricas")
     summary = policy_api.get_usage_metrics()
     formatted = format_usage_summary(summary)
     if formatted is None:
@@ -18,6 +18,7 @@ def render_metrics_panel(policy_api: PolicyAnalysisFacade) -> None:
         return
     st.table([formatted])
     st.caption(
-        "Último run do processo atual; o histórico por run_id fica no log estruturado "
-        "(decisão D-03). Custo é estimativa a partir da tabela de preços versionada."
+        "Última execução do processo atual; o histórico por ID de execução fica no "
+        "log estruturado (decisão D-03). Custo é estimativa a partir da tabela de "
+        "preços versionada."
     )
