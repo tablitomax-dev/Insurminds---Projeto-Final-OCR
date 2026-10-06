@@ -1,8 +1,9 @@
 """Tela Streamlit do analista de apólices D&O (RF-09 do requirements).
 
-Jornada: carregar 2 apólices → acompanhar estágios → extrair campos →
-consulta livre às evidências → comparar com evidências → revisão humana
-(fila por severidade) → exportar, com painel de métricas do último run.
+Jornada: carregar 2 apólices → acompanhar estágios (a seguradora é identificada
+pela LLM e dá nome às apólices) → extrair campos → conversar com o Agente
+Inteligente → comparar com evidências → indicar divergências ao Agente
+(correções revisadas alimentam a comparação) → exportar, com painel de métricas.
 
 Uso: `python -B -m streamlit run src/ui/app.py`
 A UI consome exclusivamente as fachadas públicas (RF-10, F-15), montadas no
@@ -16,12 +17,14 @@ import streamlit as st
 
 from composition_root import build_facades
 from ui.components import (
+    current_labels,
     render_comparison,
     render_export,
     render_extraction,
     render_metrics_panel,
     render_processing,
     render_query,
+    render_report,
     render_review,
     render_upload_section,
 )
@@ -55,11 +58,15 @@ field_labels = {field["code"]: field["label"] for field in fields}
 
 uploads_and_policies = render_upload_section()
 _, _, policy_id_a, policy_id_b = uploads_and_policies
-render_processing(document_api, uploads_and_policies)
-render_extraction(policy_api, (policy_id_a, policy_id_b), fields, field_labels)
-render_query(document_api, (policy_id_a, policy_id_b))
-comparison_id = render_comparison(policy_api, policy_id_a, policy_id_b, fields, field_labels)
+render_processing(document_api, policy_api, uploads_and_policies)
+labels = current_labels((policy_id_a, policy_id_b))
+render_extraction(policy_api, (policy_id_a, policy_id_b), fields, field_labels, labels)
+render_query(document_api, policy_api, (policy_id_a, policy_id_b), labels)
+comparison_id = render_comparison(
+    policy_api, policy_id_a, policy_id_b, fields, field_labels, labels
+)
 if comparison_id:
     render_export(policy_api, comparison_id)
+render_report(policy_api, (policy_id_a, policy_id_b), labels)
 render_metrics_panel(policy_api)
-render_review(policy_api)
+render_review(policy_api, (policy_id_a, policy_id_b), labels)
