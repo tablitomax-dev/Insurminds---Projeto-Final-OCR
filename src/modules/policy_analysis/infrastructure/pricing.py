@@ -9,11 +9,14 @@ A data de referência é exposta no painel e no log: o valor é **estimativa**
 from __future__ import annotations
 
 #: Data de referência da tabela de preços (visível no painel — decisão D-04).
-PRICE_REFERENCE_DATE = "2026-09-26"
+PRICE_REFERENCE_DATE = "2026-10-04"
 
 #: Preço em USD por 1 milhão de tokens: modelo -> (entrada, saída).
 USD_PER_1M_TOKENS: dict[str, tuple[float, float]] = {
     "gemini-2.0-flash": (0.10, 0.40),
+    # OpenRouter (tabela de 2026-10-04): entrada $0.43, saída $0.87; cache read
+    # $0.0036 e batch -50% existem, mas não são modelados — custo usa lista.
+    "xiaomi/mimo-v2.6-pro": (0.43, 0.87),
 }
 
 

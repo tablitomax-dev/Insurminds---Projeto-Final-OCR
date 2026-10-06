@@ -67,12 +67,35 @@ CREATE TABLE IF NOT EXISTS comparisons (
 """
 
 
+#: Migração 2: cache persistente de markdown por página (fingerprint da fonte)
+#: e achados extras do LLM fora do catálogo fechado (feature de "campos extras").
+_SCHEMA_V2 = """
+CREATE TABLE IF NOT EXISTS document_markdown (
+    policy_id VARCHAR,
+    page_number INTEGER,
+    markdown VARCHAR,
+    fingerprint VARCHAR,
+    created_at TIMESTAMP,
+    PRIMARY KEY (policy_id, page_number)
+);
+CREATE TABLE IF NOT EXISTS extra_findings (
+    finding_id VARCHAR PRIMARY KEY,
+    policy_id VARCHAR,
+    label VARCHAR,
+    value VARCHAR,
+    detail VARCHAR,
+    evidence_ids VARCHAR,
+    created_at TIMESTAMP
+);
+"""
+
 #: Migrações versionadas do schema (D2-P2-3). A baseline `001` é o schema
 #: atual (4 tabelas). Para evoluir: acrescentar `{N: SQL}` e bumpar — cada
 #: migração roda uma vez e fica registrada em `schema_migrations`. Os
 #: `CREATE ... IF NOT EXISTS` mantêm a adoção de bancos antigos idempotente.
 _MIGRATIONS: dict[int, str] = {
     1: _SCHEMA,
+    2: _SCHEMA_V2,
 }
 
 _MIGRATIONS_TABLE = """
@@ -282,6 +305,73 @@ class PolicyAnalysisRepository:
             "UPDATE comparisons SET explicacao = ? WHERE comparison_id = ? AND field_code = ?",
             [explicacao, comparison_id, field_code],
         )
+
+    # --- markdown por página (cache de extração, migração 2) -------------------
+
+    def upsert_markdown_page(
+        self,
+        policy_id: str,
+        page_number: int,
+        markdown: str,
+        fingerprint: str | None = None,
+    ) -> None:
+        """Grava o markdown de uma página (upsert DELETE+INSERT, EC-06)."""
+        self._con.execute(
+            "DELETE FROM document_markdown WHERE policy_id = ? AND page_number = ?",
+            [policy_id, page_number],
+        )
+        self._con.execute(
+            "INSERT INTO document_markdown VALUES (?, ?, ?, ?, ?)",
+            [policy_id, page_number, markdown, fingerprint, datetime.now(UTC)],
+        )
+
+    def get_markdown_pages(self, policy_id: str) -> list[tuple[int, str]]:
+        """Páginas do markdown em ordem de leitura: `(page_number, markdown)`."""
+        rows = self._con.execute(
+            "SELECT page_number, markdown FROM document_markdown "
+            "WHERE policy_id = ? ORDER BY page_number",
+            [policy_id],
+        ).fetchall()
+        return [(row[0], row[1]) for row in rows]
+
+    # --- achados extras (fora do catálogo fechado, migração 2) -----------------
+
+    def upsert_extra_finding(self, finding: dict) -> None:
+        """Grava um achado extra (upsert DELETE+INSERT, EC-06)."""
+        self._con.execute("DELETE FROM extra_findings WHERE finding_id = ?", [finding["finding_id"]])
+        self._con.execute(
+            "INSERT INTO extra_findings VALUES (?, ?, ?, ?, ?, ?, ?)",
+            [
+                finding["finding_id"],
+                finding["policy_id"],
+                finding.get("label"),
+                _dumps(finding.get("value")),
+                finding.get("detail"),
+                _dumps(finding.get("evidence_ids")),
+                datetime.now(UTC),
+            ],
+        )
+
+    def get_extra_findings(self, policy_id: str) -> list[dict]:
+        """Achados extras da apólice, com `evidence_ids` de volta como lista."""
+        rows = self._con.execute(
+            "SELECT * FROM extra_findings WHERE policy_id = ? ORDER BY finding_id", [policy_id]
+        ).fetchall()
+        return [
+            {
+                "finding_id": row[0],
+                "policy_id": row[1],
+                "label": row[2],
+                "value": _loads(row[3]),
+                "detail": row[4],
+                "evidence_ids": _loads(row[5]) or [],
+            }
+            for row in rows
+        ]
+
+    def delete_extra_findings(self, policy_id: str) -> None:
+        """Limpa os achados da apólice (padrão EC-06 delete+insert de re-extração)."""
+        self._con.execute("DELETE FROM extra_findings WHERE policy_id = ?", [policy_id])
 
     # --- conversões -------------------------------------------------------------
 

@@ -11,6 +11,9 @@ Saída normalizada em `LayoutRegion`, em ordem de leitura:
 - `table`: TSV (linhas `\\n`, células `\\t`) — serializado pelo domínio;
 - `text`: trecho corrido.
 
+`analyze_page_markdown` devolve o markdown nativo da página (defensivo entre
+versões do SDK), com fallback composto a partir das próprias regiões.
+
 A normalização é defensiva entre versões do SDK (mesmo cuidado do
 `GeminiEmbedder`): aceita resultados já normalizados (`{"kind", "text"}`),
 resumos (`{"headings"/"texts"/"tables_html"}`) e o formato do PP-StructureV3
@@ -71,6 +74,68 @@ def _text_of(value, key: str):
     return getattr(value, key, None)
 
 
+def _coerce_markdown(value) -> str | None:
+    """Normaliza um valor de markdown do SDK: string direta ou dict com `text`."""
+    if isinstance(value, str):
+        return value.strip() or None
+    if isinstance(value, dict):
+        return _coerce_markdown(value.get("text"))
+    return None
+
+
+def _markdown_of(result) -> str | None:
+    """Lê o markdown nativo de um resultado do SDK (defensivo entre versões).
+
+    Ordem de tentativa (mesmo cuidado de `_text_of`): `markdown_text`; `md_info`
+    com `markdown`/`markdown_text`; chave `markdown` (string ou dict com
+    `text`). `None` quando nenhuma forma está disponível.
+    """
+    text = _coerce_markdown(_text_of(result, "markdown_text"))
+    if text:
+        return text
+    md_info = _text_of(result, "md_info")
+    if md_info is not None:
+        text = _coerce_markdown(_text_of(md_info, "markdown")) or _coerce_markdown(
+            _text_of(md_info, "markdown_text")
+        )
+        if text:
+            return text
+    return _coerce_markdown(_text_of(result, "markdown"))
+
+
+def _table_markdown(table_tsv: str) -> str:
+    """TSV de tabela (linhas `\\n`, células `\\t`) em tabela markdown de pipe."""
+    rows: list[str] = []
+    for row in table_tsv.splitlines():
+        cells = [cell.strip() for cell in row.split("\t")]
+        if not any(cells):
+            continue
+        rows.append("| " + " | ".join(cells) + " |")
+    return "\n".join(rows)
+
+
+def _compose_page_markdown(regions: list[LayoutRegion]) -> str:
+    """Compõe markdown a partir das regiões quando o SDK não expõe markdown.
+
+    Em ordem de leitura: `heading` vira `## texto`, `table` vira tabela de
+    pipe (`| a | b |`) e `text` vira parágrafo — blocos separados por linha
+    em branco. Região sem conteúdo renderizado é descartada.
+    """
+    blocks: list[str] = []
+    for region in sorted(regions, key=lambda r: getattr(r, "order", 0)):
+        raw = str(getattr(region, "text", "") or "")
+        kind = getattr(region, "kind", None)
+        if kind == "heading":
+            rendered = f"## {raw.strip()}"
+        elif kind == "table":
+            rendered = _table_markdown(raw)
+        else:
+            rendered = raw.strip()
+        if rendered:
+            blocks.append(rendered)
+    return "\n\n".join(blocks)
+
+
 def _regions_from_result(result, order: int) -> list[LayoutRegion]:
     """Normaliza um resultado do SDK em `LayoutRegion` (ordem de leitura)."""
     if isinstance(result, list):
@@ -111,6 +176,10 @@ class PpStructureLayoutEngine:
     def __init__(self, sdk_bundle: tuple[str, object] | None = None) -> None:
         self._kind, self._sdk = sdk_bundle if sdk_bundle is not None else self._load_sdk()
         self._engine = None
+        # Cache da predição por página (validação real 2026-10-06): regiões e
+        # markdown compartilham UMA rodada do engine — sem ele, processamento e
+        # extração de markdown rodam o PP-StructureV3 duas vezes por página.
+        self._prediction_cache: dict[tuple[str, int], list] = {}
 
     @staticmethod
     def _load_sdk() -> tuple[str, object]:
@@ -124,37 +193,92 @@ class PpStructureLayoutEngine:
 
     def analyze_page(self, file_path: str, page_number: int) -> list[LayoutRegion]:
         try:
-            fitz = _load_fitz()
-            with fitz.open(file_path) as document:
-                page = document.load_page(page_number - 1)
-                pixmap = page.get_pixmap(dpi=LAYOUT_RENDER_DPI)
-
-            handle = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
-            image_path = handle.name
-            handle.close()
-            try:
-                pixmap.save(image_path)
-                return self._run_engine(image_path)
-            finally:
-                os.remove(image_path)
+            results = self._predict_page(file_path, page_number)
+            regions: list[LayoutRegion] = []
+            for order, result in enumerate(results):
+                regions.extend(_regions_from_result(result, order))
+            return regions
         except Exception as exc:  # erro externo (SDK) traduzido para a porta (D1-P0-1)
             raise LayoutError(
                 f"falha na análise de layout da página {page_number} ({type(exc).__name__})"
             ) from exc
 
-    def _run_engine(self, image_path: str) -> list[LayoutRegion]:
+    def analyze_page_markdown(self, file_path: str, page_number: int) -> str | None:
+        """Markdown estruturado nativo da página, ou `None` sem conteúdo.
+
+        Lê o markdown do resultado do SDK de forma defensiva entre versões
+        (`markdown_text`, `md_info` ou `markdown`); quando a versão não expõe
+        markdown, compõe a partir das regiões já normalizadas (headings `##`,
+        tabelas em pipe, textos como parágrafos). `None` marca ausência de
+        conteúdo — o chamador degrada para o texto extraído (RN-05), então o
+        fluxo nunca cai por aqui. Exceção do SDK vira `LayoutError` sanitizada,
+        no mesmo contrato de `analyze_page` (só tipo do erro e página, nunca
+        texto de apólice — D1-P0-1, T-2a).
+        """
+        try:
+            results = self._predict_page(file_path, page_number)
+        except Exception as exc:  # erro externo (SDK) traduzido para a porta (D1-P0-1)
+            raise LayoutError(
+                f"falha na análise de layout da página {page_number} ({type(exc).__name__})"
+            ) from exc
+        for result in results:
+            markdown = _markdown_of(result)
+            if markdown:
+                return markdown
+        regions: list[LayoutRegion] = []
+        for order, result in enumerate(results):
+            regions.extend(_regions_from_result(result, order))
+        return _compose_page_markdown(regions) or None
+
+    def _predict_page(self, file_path: str, page_number: int) -> list:
+        """Renderiza a página em PNG temporário e roda o engine sobre ela.
+
+        O resultado fica em cache por `(file_path, page_number)`: `analyze_page`
+        e `analyze_page_markdown` compartilham a mesma predição (uma rodada do
+        PP-StructureV3 por página, custo unitário da validação real).
+        """
+        cache_key = (file_path, page_number)
+        if cache_key in self._prediction_cache:
+            return self._prediction_cache[cache_key]
+        fitz = _load_fitz()
+        with fitz.open(file_path) as document:
+            page = document.load_page(page_number - 1)
+            pixmap = page.get_pixmap(dpi=LAYOUT_RENDER_DPI)
+
+        handle = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+        image_path = handle.name
+        handle.close()
+        try:
+            pixmap.save(image_path)
+            results = self._predict(image_path)
+        finally:
+            os.remove(image_path)
+        self._prediction_cache[cache_key] = results
+        return results
+
+    def _predict(self, image_path: str) -> list:
+        """Roda o SDK (`predict` ou chamável) e devolve os resultados crus."""
         engine = self._ensure_engine()
         results = (
             engine.predict(input=image_path)
             if hasattr(engine, "predict")
             else engine(image_path)
         )
-        regions: list[LayoutRegion] = []
-        for order, result in enumerate(results or []):
-            regions.extend(_regions_from_result(result, order))
-        return regions
+        return list(results or [])
 
     def _ensure_engine(self):
         if self._engine is None:
-            self._engine = self._sdk.PPStructureV3()
+            # Submódulos sem uso em apólices ficam desativados (validação real
+            # 2026-10-06): fórmulas, selos, gráficos, regiões e classificação de
+            # orientação não existem em clausulados — desativá-los evita baixar
+            # e rodar modelos pesados sem benefício. Tabelas e layout continuam.
+            self._engine = self._sdk.PPStructureV3(
+                use_doc_orientation_classify=False,
+                use_doc_unwarping=False,
+                use_textline_orientation=False,
+                use_seal_recognition=False,
+                use_formula_recognition=False,
+                use_chart_recognition=False,
+                use_region_detection=False,
+            )
         return self._engine

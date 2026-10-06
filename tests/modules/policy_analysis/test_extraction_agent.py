@@ -231,3 +231,120 @@ def _memory_repo():
     from modules.policy_analysis.infrastructure.duckdb_repository import PolicyAnalysisRepository
 
     return PolicyAnalysisRepository(":memory:")
+
+
+# --- provedor do LLM: Gemini x OpenRouter (LLM_MODEL / OPENROUTER_API_KEY) ---
+
+
+def test_rota_de_provedor_por_id_do_modelo():
+    from modules.policy_analysis.infrastructure.llm_agent import _api_key_env_for, _provider_for
+
+    assert _provider_for("xiaomi/mimo-v2.6-pro") == "openrouter"
+    assert _provider_for("gemini-3.8-flash") == "gemini"
+    assert _api_key_env_for("xiaomi/mimo-v2.6-pro") == "OPENROUTER_API_KEY"
+    assert _api_key_env_for("gemini-3.8-flash") == "GEMINI_API_KEY"
+
+
+def test_cliente_resolve_modelo_e_chave_pelo_env(monkeypatch):
+    from modules.policy_analysis.infrastructure.llm_agent import PydanticAIClient
+
+    monkeypatch.setenv("LLM_MODEL", "xiaomi/mimo-v2.6-pro")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-teste")
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+
+    client = PydanticAIClient()
+    assert client._model_name == "xiaomi/mimo-v2.6-pro"
+    assert client._api_key == "sk-or-teste"
+
+
+def test_erro_de_chave_menciona_o_env_do_provedor(monkeypatch):
+    from modules.policy_analysis.infrastructure.llm_agent import PydanticAIClient
+
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+
+    client = PydanticAIClient(model_name="xiaomi/mimo-v2.6-pro")
+    with pytest.raises(ClassifiedError) as exc:
+        client.complete_json("prompt")
+    assert exc.value.code == "LLM_API_KEY_MISSING"
+    assert "OPENROUTER_API_KEY" in exc.value.message
+
+
+# --- valor escalar do LLM (contrato `value: dict` do fato) -------------------
+
+
+def test_llm_com_valor_escalar_e_normalizado(evidences_a):
+    raw = [
+        {
+            "field_code": "franquia",
+            "status": "FOUND",
+            "value": "R$ 60.000,00",
+            "confidence": 0.9,
+            "evidence_ids": ["EV-A-001"],
+            "requires_human_review": False,
+        }
+    ]
+    service = ExtractionService(
+        MockEvidenceSource({"POL-A": evidences_a}), StubAgent(raw), _memory_repo()
+    )
+
+    fact = service.extract_fields("POL-A", ["franquia"])[0]
+    assert fact.status == "FOUND"
+    assert fact.value == {"amount": "R$ 60.000,00", "currency": "BRL"}
+    assert fact.normalized_value == {"amount": "60000.00", "currency": "BRL"}
+
+
+def test_llm_com_escalar_irreconhecivel_vira_needs_review(evidences_a):
+    raw = [
+        {
+            "field_code": "vigencia",
+            "status": "FOUND",
+            "value": "01/01/2025",  # período exige 2 datas — irreconhecível
+            "confidence": 0.9,
+            "evidence_ids": ["EV-A-001"],
+            "requires_human_review": False,
+        }
+    ]
+    service = ExtractionService(
+        MockEvidenceSource({"POL-A": evidences_a}), StubAgent(raw), _memory_repo()
+    )
+
+    fact = service.extract_fields("POL-A", ["vigencia"])[0]
+    assert fact.status == "NEEDS_REVIEW"
+    assert fact.requires_human_review is True
+    assert fact.value is None
+    assert fact.normalized_value is None
+
+
+# --- run_sync em thread própria (contexto asyncio do Streamlit 1.65) ---------
+
+
+def test_run_agent_blocking_funciona_com_loop_asyncio_rodando():
+    import asyncio
+
+    from modules.policy_analysis.infrastructure.llm_agent import _run_agent_blocking
+
+    class FakeAgent:
+        def run_sync(self, prompt, **kwargs):
+            import asyncio as aio
+
+            try:
+                aio.get_running_loop()
+            except RuntimeError:
+                return {"ok": True}  # thread própria: sem loop ativo
+            raise AssertionError("run_sync rodou dentro de loop ativo")
+
+    async def _com_loop():
+        return _run_agent_blocking(FakeAgent(), "prompt", {})
+
+    assert asyncio.run(_com_loop()) == {"ok": True}
+
+
+def test_run_agent_blocking_repropaga_erro_do_agente():
+    from modules.policy_analysis.infrastructure.llm_agent import _run_agent_blocking
+
+    class FakeAgent:
+        def run_sync(self, prompt, **kwargs):
+            raise ValueError("falha do provedor")
+
+    with pytest.raises(ValueError):
+        _run_agent_blocking(FakeAgent(), "prompt", {})

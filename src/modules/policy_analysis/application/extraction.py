@@ -17,7 +17,7 @@ from shared_kernel.contracts import ExtractedFact, ExtractionRequest
 from ..domain.anchoring import is_anchored
 from ..domain.field_catalog import FieldType, get_field
 from ..domain.rules import RuleViolation, validate_fact
-from ..domain.value_types import NormalizationError, normalize_value
+from ..domain.value_types import NormalizationError, normalize_value, raw_value_from_text
 from .errors import ClassifiedError
 
 SCHEMA_VERSION = "1.0"
@@ -103,6 +103,18 @@ class ExtractionService:
         requires_review = bool(raw.get("requires_human_review", False))
         normalized_value = None
         spec = get_field(req.field_code)
+
+        if value is not None and not isinstance(value, dict):
+            # LLM devolve `value` escalar (ex.: "R$ 1.000.000"); o contrato do
+            # fato exige dict — usa a regra de tipo do valor digitado pelo
+            # analista. Irreconhecível → EC-04: sem valor e NEEDS_REVIEW.
+            try:
+                value = raw_value_from_text(spec, str(value))
+            except NormalizationError:
+                value = None
+                if status == "FOUND":
+                    status = "NEEDS_REVIEW"
+                    requires_review = True
 
         if status == "FOUND" and value is not None:
             try:

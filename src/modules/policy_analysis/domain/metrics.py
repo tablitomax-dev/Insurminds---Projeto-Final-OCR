@@ -15,13 +15,18 @@ from pydantic import BaseModel, Field
 #: Tipos de chamada instrumentada.
 KIND_EXTRACT = "EXTRACT"
 KIND_EXPLAIN = "EXPLAIN"
+KIND_IDENTIFY = "IDENTIFY"
+KIND_QUESTION = "QUESTION"
+KIND_REVIEW = "REVIEW"
+KIND_EXTRA = "extra_findings"
 
 
 class UsageRecord(BaseModel):
     """Uma chamada de LLM medida (RF-03)."""
 
     run_id: str = Field(min_length=1)
-    kind: str = Field(min_length=1)  # KIND_EXTRACT | KIND_EXPLAIN
+    # KIND_EXTRACT | KIND_EXPLAIN | KIND_IDENTIFY | KIND_QUESTION | KIND_REVIEW | KIND_EXTRA
+    kind: str = Field(min_length=1)
     model_name: str = Field(min_length=1)
     request_tokens: int = Field(ge=0)
     response_tokens: int = Field(ge=0)

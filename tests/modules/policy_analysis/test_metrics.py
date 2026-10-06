@@ -38,8 +38,15 @@ def test_custo_estimado_de_modelo_desconhecido_e_none():
     assert compute_cost_usd("modelo-inexistente", 1_000, 1_000) is None
 
 
+def test_custo_estimado_usa_tabela_do_mimo_openrouter():
+    # 1M de tokens de entrada a $0.43 + 1M de saída a $0.87 = $1.30.
+    assert compute_cost_usd("xiaomi/mimo-v2.6-pro", 1_000_000, 1_000_000) == 1.3
+    # 500k entrada + 100k saída = $0.215 + $0.087 = $0.302.
+    assert compute_cost_usd("xiaomi/mimo-v2.6-pro", 500_000, 100_000) == 0.302
+
+
 def test_tabela_de_precos_registra_data_de_referencia():
-    assert PRICE_REFERENCE_DATE == "2026-09-26"
+    assert PRICE_REFERENCE_DATE == "2026-10-04"
 
 
 def test_coletor_agrega_chamadas_por_run_id():
@@ -70,7 +77,7 @@ def test_coletor_agrega_chamadas_por_run_id():
     assert summary.response_tokens == 30
     assert summary.latency_ms == 500
     assert summary.cost_usd == 0.000015
-    assert summary.price_reference_date == "2026-09-26"
+    assert summary.price_reference_date == PRICE_REFERENCE_DATE
 
 
 def test_coletor_sem_metricas_devolve_none():
@@ -244,7 +251,7 @@ def test_summarize_agrega_chamadas_por_run_id():
     assert summary.response_tokens == 1_000
     assert summary.latency_ms >= 0
     assert summary.cost_usd == 0.0006
-    assert summary.price_reference_date == "2026-09-26"
+    assert summary.price_reference_date == PRICE_REFERENCE_DATE
 
 
 def test_metricas_nao_contem_texto_de_apolice():
