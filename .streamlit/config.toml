@@ -1,0 +1,25 @@
+# Tema do analista — fundo preto, letras brancas (decisão do usuário, 2026-10-04).
+# Tema nativo do Streamlit (sem CSS customizado).
+[theme]
+base = "dark"
+backgroundColor = "#000000"
+secondaryBackgroundColor = "#141414"
+textColor = "#FFFFFF"
+# Cinza escuro: o texto do botão primário é branco e precisa de contraste.
+primaryColor = "#4A4A4A"
+linkColor = "#FFFFFF"
+codeTextColor = "#FFFFFF"
+codeBackgroundColor = "#141414"
+borderColor = "#333333"
+showWidgetBorder = true
+showSidebarBorder = true
+
+dataframeBorderColor = "#333333"
+dataframeHeaderBackgroundColor = "#141414"
+dataframeHeaderTextColor = "#FFFFFF"
+
+[theme.sidebar]
+backgroundColor = "#000000"
+secondaryBackgroundColor = "#141414"
+textColor = "#FFFFFF"
+borderColor = "#333333"
