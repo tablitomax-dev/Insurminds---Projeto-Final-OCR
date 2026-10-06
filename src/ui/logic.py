@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import re
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
+from string import ascii_uppercase
 
 from modules.policy_analysis.public_api import (
     SEVERITY_ORDER,
@@ -39,8 +41,75 @@ _SOURCE_LABELS: dict[str, str] = {
     "PP_STRUCTURE": "estrutura de layout",
 }
 
+#: Status do fato extraído → leitura humana do analista (pt-br).
+STATUS_LABELS: dict[str, str] = {
+    "FOUND": "encontrado",
+    "NOT_FOUND": "não encontrado",
+    "AMBIGUOUS": "ambíguo",
+    "NEEDS_REVIEW": "revisão necessária",
+}
+
+#: Estágio do processamento → leitura humana do analista (pt-br).
+STAGE_LABELS: dict[str, str] = {
+    "RECEIVED": "recebido",
+    "TEXT_EXTRACTED": "texto extraído",
+    "OCR_COMPLETED": "OCR concluído",
+    "INDEXED": "indexado",
+    "REVIEW_REQUIRED": "revisão necessária",
+    "FAILED": "falhou",
+}
+
+
+def status_label(status: str) -> str:
+    """Status do fato em pt-br (o contrato interno continua em inglês)."""
+    return STATUS_LABELS.get(status, status)
+
+
+def stage_label(stage: str) -> str:
+    """Estágio do processamento em pt-br (o contrato interno continua em inglês)."""
+    return STAGE_LABELS.get(stage, stage)
+
 #: Tamanho máximo do trecho na tabela da consulta (detalhe fica no expander).
 _SNIPPET_LIMIT = 160
+
+
+def policy_id_from_filename(filename: str) -> str:
+    """`policy_id` estável a partir do nome do PDF (sem id genérico na UI)."""
+    slug = re.sub(r"[^0-9a-zA-Z]+", "_", Path(filename).stem).strip("_").lower()
+    return slug or "apolice"
+
+
+def build_display_labels(
+    policy_ids, insurer_info: dict[str, dict | None]
+) -> dict[str, str]:
+    """Rótulo de exibição de cada apólice: o nome real da seguradora.
+
+    Desempate quando as duas apólices são da mesma empresa: anos diferentes →
+    `Empresa 2024`/`Empresa 2025`; mesmo ano (ou sem ano) → `Empresa A/B`.
+    Sem nome detectado, o rótulo é o próprio `policy_id` (a UI pede o nome ao
+    usuário e refaz os rótulos).
+    """
+    ids = list(policy_ids)
+    names = {pid: str((insurer_info.get(pid) or {}).get("name") or "") for pid in ids}
+    years = {pid: str((insurer_info.get(pid) or {}).get("year") or "") for pid in ids}
+    counts: dict[str, int] = {}
+    for name in names.values():
+        if name:
+            counts[name] = counts.get(name, 0) + 1
+
+    labels: dict[str, str] = {pid: names[pid] or pid for pid in ids}
+    for name, count in counts.items():
+        if count < 2:
+            continue
+        group = [pid for pid in ids if names[pid] == name]
+        group_years = [years[pid] for pid in group]
+        if all(group_years) and len(set(group_years)) == len(group):
+            for pid in group:
+                labels[pid] = f"{names[pid]} {years[pid]}"
+        else:
+            for suffix, pid in zip(ascii_uppercase, group):
+                labels[pid] = f"{names[pid]} {suffix}"
+    return labels
 
 
 def group_by_severity(
@@ -82,7 +151,7 @@ def format_usage_summary(summary: UsageSummary | None) -> dict[str, str] | None:
         else f"US$ {summary.cost_usd:.6f}"
     )
     return {
-        "run_id": summary.run_id,
+        "ID da execução": summary.run_id,
         "chamadas de LLM": str(summary.calls),
         "tokens de entrada": str(summary.request_tokens),
         "tokens de saída": str(summary.response_tokens),
@@ -163,22 +232,25 @@ def _snippet(text: str, limit: int = _SNIPPET_LIMIT) -> str:
     return flat[:limit].rstrip() + "…"
 
 
-def format_evidence_rows(evidences: list[EvidenceRef]) -> list[dict[str, str]]:
+def format_evidence_rows(
+    evidences: list[EvidenceRef], labels: dict[str, str] | None = None
+) -> list[dict[str, str]]:
     """Formata as evidências da consulta para a tabela — sem JSON, sem tipos.
 
     Ausências viram `—`; o score vai em `0,00` pt-BR; o trecho aparece
     resumido (o texto completo fica no expander da tela de consulta).
+    `labels` troca o `policy_id` cru pelo nome real da seguradora.
     """
     rows: list[dict[str, str]] = []
     for evidence in evidences:
         score = evidence.retrieval_score
         rows.append(
             {
-                "apólice": evidence.policy_id,
+                "apólice": (labels or {}).get(evidence.policy_id, evidence.policy_id),
                 "página": str(evidence.page_number),
                 "seção": evidence.section_name or "—",
                 "trecho": _snippet(evidence.quoted_text),
-                "score": "—" if score is None else _decimal_br(score, decimals=2),
+                "similaridade": "—" if score is None else _decimal_br(score, decimals=2),
                 "origem": _SOURCE_LABELS.get(evidence.source_type, evidence.source_type),
             }
         )

@@ -118,3 +118,63 @@ def _render_tsv(table_tsv: str) -> str:
             continue
         lines.append(" | ".join(cells))
     return "\n".join(lines)
+
+
+# ------------------------------- Seções de markdown estruturado (caminho markdown)
+
+#: Heading ATX de markdown: 1 a 4 `#` seguidos de espaço e título não vazio.
+#: `#####` ou mais `#`, e linha sem título, NÃO separam seção (determinístico).
+ATX_HEADING_PATTERN = re.compile(r"^(#{1,4})[ \t]+(\S.*)$", re.MULTILINE)
+
+
+@dataclass(frozen=True)
+class MarkdownSection:
+    """Seção de uma página em markdown, na ordem de leitura.
+
+    `title` é o literal do heading ATX sem os `#`; texto anterior ao primeiro
+    heading vira seção com `title=None`. `body` é o texto entre o heading e o
+    próximo (sem o próprio heading). `index` é 0-based na ordem de leitura.
+    """
+
+    title: str | None
+    body: str
+    page_number: int
+    index: int
+
+
+def split_markdown_sections(markdown: str, page_number: int) -> list[MarkdownSection]:
+    """Quebra o markdown de uma página em seções por headings ATX (níveis 1–4).
+
+    Regras determinísticas (mesma entrada, mesma saída):
+    - texto antes do primeiro heading vira seção com `title=None`;
+    - heading define o título da seção seguinte, excluído do corpo;
+    - seções com corpo vazio são descartadas (inclusive o preâmbulo);
+    - a lista devolvida segue a ordem de leitura, com `index` sequencial.
+    """
+    blocks: list[tuple[str | None, list[str]]] = []
+    current_title: str | None = None
+    current_lines: list[str] = []
+    for line in markdown.splitlines():
+        match = ATX_HEADING_PATTERN.match(line)
+        if match is None:
+            current_lines.append(line)
+            continue
+        blocks.append((current_title, current_lines))
+        current_title = match.group(2).strip()
+        current_lines = []
+    blocks.append((current_title, current_lines))
+
+    sections: list[MarkdownSection] = []
+    for title, lines in blocks:
+        body = "\n".join(lines).strip()
+        if not body:
+            continue
+        sections.append(
+            MarkdownSection(
+                title=title,
+                body=body,
+                page_number=page_number,
+                index=len(sections),
+            )
+        )
+    return sections

@@ -166,6 +166,31 @@ class InMemoryFactRepository:
         return self.comparisons.get(comparison_id)
 
 
+class SlotFallback(dict):
+    """Dict de fixtures com fallback por ordem de primeiro uso (demo/UI).
+
+    A UI deriva o `policy_id` do nome do PDF; o demo não conhece os nomes de
+    antemão, então ids desconhecidos recebem a próxima fixture na ordem de
+    registro (1ª apólice → 1ª fixture, 2ª → 2ª). Ids conhecidos casam exato.
+    """
+
+    def __init__(self, mapping: dict) -> None:
+        super().__init__(mapping)
+        self._values = list(mapping.values())
+        self._assigned: dict = {}
+
+    def get(self, key, default=None):  # type: ignore[override]
+        if dict.__contains__(self, key):
+            return dict.get(self, key)
+        if key in self._assigned:
+            return self._assigned[key]
+        if not self._values:
+            return default
+        value = self._values[len(self._assigned) % len(self._values)]
+        self._assigned[key] = value
+        return value
+
+
 __all__ = [
     "FailingExtractionAgent",
     "FixtureExplanationAgent",
@@ -173,6 +198,7 @@ __all__ = [
     "InMemoryFactRepository",
     "MockEvidenceSource",
     "ScriptedExtractionAgent",
+    "SlotFallback",
     "make_evidence",
     "make_fact",
 ]

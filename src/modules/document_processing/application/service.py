@@ -5,14 +5,22 @@
 """
 
 import uuid
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from shared_kernel.contracts import EvidenceRef, ProcessingStatus, RetrievalQuery, RetrievalResult
+from shared_kernel.contracts import (
+    EvidenceRef,
+    ProcessingStatus,
+    RetrievalQuery,
+    RetrievalResult,
+    SourceType,
+)
 
 from ..domain.chunk_fingerprint import compute_content_fingerprint
 from ..domain.processing import (
     ChunkRecord,
+    PageText,
     build_chunk_metadata,
     chunk_text,
     classify_page,
@@ -52,6 +60,20 @@ def compose_search_text(query_text: str, field_code: str | None) -> str:
     return query_text + FIELD_CODE_HINT_TEMPLATE.format(field_code=field_code)
 
 
+@dataclass
+class PageMarkdown:
+    """Markdown estruturado de uma página, com a origem do conteúdo.
+
+    `source_type` registra de onde veio o markdown: `PP_STRUCTURE` (markdown
+    nativo do motor de layout), `NATIVE_TEXT` (texto nativo da página) ou
+    `PADDLEOCR` (resultado do OCR).
+    """
+
+    page_number: int
+    markdown: str
+    source_type: SourceType
+
+
 class DocumentProcessingService:
     """Pipeline: validar → extrair → OCR → chunkar → embeddar → indexar (RF-01..RF-06)."""
 
@@ -72,6 +94,11 @@ class DocumentProcessingService:
         self._status_sink = status_sink
         self._layout_engine = layout_engine
         self._max_pdf_bytes = max_pdf_bytes
+        # Caches por instância (`file_path` → página → resultado): OCR e
+        # markdown por página rodam no máximo uma vez para a mesma página —
+        # processamento, preview e markdown compartilham o mesmo resultado.
+        self._ocr_cache: dict[str, dict[int, tuple[str, float | None]]] = {}
+        self._page_markdown_cache: dict[str, dict[int, PageMarkdown]] = {}
 
     def process_document(
         self,
@@ -106,9 +133,7 @@ class DocumentProcessingService:
                 if source_type == "NATIVE_TEXT":
                     text, ocr_confidence = page.text, None
                 else:
-                    text, ocr_confidence = self._ocr_engine.ocr_page(
-                        file_path, page.page_number
-                    )
+                    text, ocr_confidence = self._ocr_cached(file_path, page.page_number)
                     ocr_page_numbers.append(page.page_number)
                 # Layout (dev1-006): análise estrutural da página; degrada
                 # silenciosamente para o texto já extraído (RN-05).
@@ -234,6 +259,125 @@ class DocumentProcessingService:
             evidences=evidences,
             retrieval_run_id=uuid.uuid4().hex,
         )
+
+    def extract_preview_pages(self, file_path: str, max_pages: int = 2) -> list[str]:
+        """Preview das primeiras páginas: OCR/visão primeiro + texto nativo.
+
+        O OCR roda sempre (a visão capta logo/cabeçalho que o texto nativo
+        perde) e cada bloco é marcado com a origem (`[OCR/visão]`,
+        `[texto nativo]`) para o consumidor priorizar a visão. Página ilegível
+        vira string vazia — o preview degrada e nunca falha o fluxo (EC-04).
+        O OCR sai do cache compartilhado com `extract_markdown_pages`: roda no
+        máximo uma vez por página na mesma instância do serviço.
+        """
+        pages = self._text_extractor.extract_pages(file_path)[:max_pages]
+        texts: list[str] = []
+        for page in pages:
+            ocr_text = ""
+            try:
+                ocr_text, _ = self._ocr_cached(file_path, page.page_number)
+            except Exception:  # noqa: BLE001 — preview degrada, nunca quebra
+                ocr_text = ""
+            parts: list[str] = []
+            if ocr_text.strip():
+                parts.append(f"[OCR/visão]\n{ocr_text.strip()}")
+            if (page.text or "").strip():
+                parts.append(f"[texto nativo]\n{page.text.strip()}")
+            texts.append("\n".join(parts))
+        return texts
+
+    def extract_markdown_pages(
+        self, file_path: str, max_pages: int | None = None
+    ) -> list[PageMarkdown]:
+        """Markdown estruturado de cada página, em ordem de leitura.
+
+        Por página, a origem é decidida nesta ordem:
+        1. markdown nativo do motor de layout (`PP_STRUCTURE`) — quando existe
+           `analyze_page_markdown` (duck-typed, fakes antigos continuam válidos)
+           e o motor devolve conteúdo;
+        2. texto nativo suficiente (`NATIVE_TEXT`, `classify_page`);
+        3. OCR (`PADDLEOCR`), com o resultado no cache compartilhado.
+
+        `max_pages` limita às primeiras páginas; `None` devolve todas. Falha de
+        layout/OCR degrada para o texto disponível, sem derrubar o fluxo
+        (RN-05/EC-04). O cache por instância garante que OCR e markdown por
+        página rodam no máximo uma vez — processamento e preview compartilham
+        o mesmo resultado.
+        """
+        pages = self._text_extractor.extract_pages(file_path)
+        if max_pages is not None:
+            pages = pages[:max_pages]
+        results: list[PageMarkdown] = []
+        cache = self._page_markdown_cache.setdefault(file_path, {})
+        for page in pages:
+            cached = cache.get(page.page_number)
+            if cached is not None:
+                results.append(cached)
+                continue
+            result = self._page_markdown(file_path, page)
+            cache[page.page_number] = result
+            results.append(result)
+        return results
+
+    def _page_markdown(self, file_path: str, page: PageText) -> PageMarkdown:
+        """Resolve o markdown de uma página na ordem layout → nativo → OCR."""
+        markdown = self._layout_page_markdown(file_path, page.page_number)
+        if markdown:
+            return PageMarkdown(
+                page_number=page.page_number,
+                markdown=markdown,
+                source_type="PP_STRUCTURE",
+            )
+        native = (page.text or "").strip()
+        if classify_page(page.text) == "NATIVE_TEXT":
+            return PageMarkdown(
+                page_number=page.page_number,
+                markdown=native,
+                source_type="NATIVE_TEXT",
+            )
+        try:
+            ocr_text, _ = self._ocr_cached(file_path, page.page_number)
+        except Exception:  # noqa: BLE001 — leitura degrada, nunca quebra (EC-04)
+            return PageMarkdown(
+                page_number=page.page_number,
+                markdown=native,
+                source_type="NATIVE_TEXT",
+            )
+        return PageMarkdown(
+            page_number=page.page_number,
+            markdown=(ocr_text or "").strip(),
+            source_type="PADDLEOCR",
+        )
+
+    def _layout_page_markdown(self, file_path: str, page_number: int) -> str | None:
+        """Markdown da página pelo motor de layout; `None` = degradação (RN-05).
+
+        Duck-typed: motores sem `analyze_page_markdown` (ex.: fakes antigos)
+        continuam válidos e mandam o fluxo para texto nativo/OCR. Nenhum texto
+        de apólice sai daqui em log/mensagem (T-2a).
+        """
+        analyze_page_markdown = getattr(self._layout_engine, "analyze_page_markdown", None)
+        if analyze_page_markdown is None:
+            return None
+        try:
+            markdown = analyze_page_markdown(file_path, page_number)
+        except Exception:  # RN-05: qualquer falha do motor degrada para texto puro
+            return None
+        if isinstance(markdown, str) and markdown.strip():
+            return markdown.strip()
+        return None
+
+    def _ocr_cached(self, file_path: str, page_number: int) -> tuple[str, float | None]:
+        """Resultado do OCR da página, cacheado por instância (roda uma vez).
+
+        Processamento, preview e extração de markdown compartilham este cache;
+        falhas NÃO são cacheadas — a exceção propaga e a próxima chamada tenta
+        de novo (recuperação bem-sucedida é sempre reproduzível).
+        """
+        cache = self._ocr_cache.setdefault(file_path, {})
+        if page_number not in cache:
+            cache[page_number] = self._ocr_engine.ocr_page(file_path, page_number)
+        return cache[page_number]
 
     def _validate_pdf(self, file_path: str) -> str | None:
         """Valida existência, extensão, tamanho e cabeçalho (RF-01); None = válido."""

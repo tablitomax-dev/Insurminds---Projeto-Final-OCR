@@ -169,10 +169,18 @@ def raw_value_from_text(field, text: str, *, original: dict | None = None) -> di
 # --- chaves comparáveis (determinísticas) ------------------------------------
 
 
-def normalize_value(field, raw: dict) -> dict:
-    """Normaliza o valor bruto do LLM conforme o tipo do campo (EC-04)."""
+def normalize_value(field, raw) -> dict:
+    """Normaliza o valor bruto do LLM conforme o tipo do campo (EC-04).
+
+    O LLM pode devolver `value` escalar (ex.: "R$ 1.000.000" em vez do objeto);
+    a regra de tipo é a mesma do valor digitado pelo analista
+    (`raw_value_from_text`). Forma irreconhecível levanta `NormalizationError`
+    (→ NEEDS_REVIEW), nunca AttributeError.
+    """
     from .field_catalog import FieldType
 
+    if raw is not None and not isinstance(raw, dict):
+        raw = raw_value_from_text(field, str(raw))
     dispatch = {
         FieldType.MONEY: normalize_money_value,
         FieldType.NUMBER: normalize_number_value,

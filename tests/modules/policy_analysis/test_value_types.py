@@ -20,6 +20,7 @@ from modules.policy_analysis.domain.value_types import (
     normalize_period_value,
     normalize_text,
     normalize_text_value,
+    normalize_value,
     number_key,
     parse_date,
     parse_decimal,
@@ -121,3 +122,24 @@ def test_raw_value_from_text_periodo_exige_duas_datas_e_texto_vazio_falha():
         raw_value_from_text(get_field("vigencia"), "01/01/2025")
     with pytest.raises(NormalizationError):
         raw_value_from_text(get_field("franquia"), "   ")
+
+
+def test_normalize_value_aceita_escalar_do_llm():
+    # O modelo devolve `value` como string; vale a regra do valor digitado.
+    assert normalize_value(get_field("franquia"), "R$ 60.000,00") == {
+        "amount": "60000.00",
+        "currency": "BRL",
+    }
+    assert normalize_value(get_field("extensao_territorial"), "Mundial") == {"text": "mundial"}
+    assert normalize_value(get_field("retroatividade"), "01/01/2015") == {"date": "2015-01-01"}
+    assert normalize_value(get_field("vigencia"), "01/01/2025 a 01/01/2026") == {
+        "start": "2025-01-01",
+        "end": "2026-01-01",
+        "duration_days": 365,
+    }
+
+
+def test_normalize_value_escalar_irreconhecivel_e_normalization_error():
+    # Período com 1 data só não tem forma canônica — vira EC-04, nunca crash.
+    with pytest.raises(NormalizationError):
+        normalize_value(get_field("vigencia"), "01/01/2025")

@@ -27,7 +27,7 @@ def test_formata_valores_para_o_painel():
     formatted = format_usage_summary(_summary())
 
     assert formatted is not None
-    assert formatted["run_id"] == "run_abc"
+    assert formatted["ID da execução"] == "run_abc"
     assert formatted["chamadas de LLM"] == "2"
     assert formatted["tokens de entrada"] == "1500"
     assert formatted["tokens de saída"] == "400"

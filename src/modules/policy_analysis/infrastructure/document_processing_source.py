@@ -13,10 +13,24 @@ from ..application.errors import ClassifiedError
 
 
 class DocumentProcessingEvidenceSource:
-    """Evidências reais via `document_processing.public_api.retrieve_evidence`."""
+    """Evidências reais via `document_processing.public_api.retrieve_evidence`.
 
-    def __init__(self, top_k: int = 5, facade=None):
-        self._top_k = top_k
+    Com `field_code` ausente (pedido de "todas as evidências" da extração),
+    o resultado de várias consultas é mesclado — cada consulta traz até
+    `top_k` trechos (o contrato `RetrievalQuery` limita `top_k` a 20) e o
+    merge dá cobertura ao documento inteiro, sem quebrar o contrato.
+    """
+
+    #: Consultas ampliadas para a cobertura total do documento (extração).
+    _BREADTH_QUERIES = (
+        "limite cobertura franquia deducível",
+        "vigência prazo notificação sinistro",
+        "exclusões extensão territorial defesa de custos",
+        "retroatividade reajuste condições gerais",
+    )
+
+    def __init__(self, top_k: int = 20, facade=None):
+        self._top_k = min(top_k, 20)  # teto do contrato `RetrievalQuery`
         self._facade = facade  # injetado em teste; em produção resolve pela fachada pública
 
     def _resolve_facade(self):
@@ -35,11 +49,17 @@ class DocumentProcessingEvidenceSource:
 
     def get_evidences(self, policy_id: str, field_code: str | None = None) -> list[EvidenceRef]:
         facade = self._resolve_facade()
-        query = RetrievalQuery(
-            query=field_code or policy_id,
-            policy_id=policy_id,
-            field_code=field_code,
-            top_k=self._top_k,
-        )
-        result = facade.retrieve_evidence(query)
-        return list(result.evidences)
+        query_texts = [field_code or policy_id]
+        if field_code is None:
+            query_texts.extend(self._BREADTH_QUERIES)
+        merged: dict[str, EvidenceRef] = {}
+        for query_text in query_texts:
+            query = RetrievalQuery(
+                query=query_text,
+                policy_id=policy_id,
+                field_code=field_code,
+                top_k=self._top_k,
+            )
+            for evidence in facade.retrieve_evidence(query).evidences:
+                merged.setdefault(evidence.evidence_id, evidence)
+        return list(merged.values())

@@ -40,6 +40,22 @@ class DocumentProcessingFacade:
     def retrieve_evidence(self, query: RetrievalQuery) -> RetrievalResult:
         return self._service.retrieve_evidence(query)
 
+    def extract_preview(self, file_path: str, max_pages: int = 2) -> list[str]:
+        """Texto das primeiras páginas do arquivo (preview de identificação)."""
+        return self._service.extract_preview_pages(file_path, max_pages=max_pages)
+
+    def extract_markdown(self, file_path: str, max_pages: int | None = None) -> list[str]:
+        """Markdown estruturado de cada página, em ordem de leitura.
+
+        `max_pages` limita às primeiras páginas (`None` = todas). Compartilha o
+        cache de OCR/layout com o preview e o processamento — mesma página não
+        roda OCR duas vezes na mesma instância do serviço.
+        """
+        return [
+            page.markdown
+            for page in self._service.extract_markdown_pages(file_path, max_pages=max_pages)
+        ]
+
 
 class _LoggingStatusSink:
     """StatusSink padrão: registra cada transição no logger do módulo."""

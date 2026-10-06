@@ -7,13 +7,33 @@ name = "insurminds-platform"
 version = "1.0.0"
 description = "Plataforma de análise e comparação de apólices D&O (monólito modular em Python)"
 requires-python = ">=3.11"
+# Stack completo do projeto — instalável de ponta a ponta com
+# `pip install -e ".[dev]"` (reprodução/simulação em ambiente novo).
 dependencies = [
+    # Núcleo e contrato versionado (shared_kernel).
     "pydantic>=2,<3",
+    # LLM via Pydantic AI: Gemini (GoogleModel) e OpenRouter (OpenAIModel).
+    # Os extras trazem google-genai e openai; google-genai também é usado
+    # direto pelo pipeline (embeddings do document_processing).
+    "pydantic-ai-slim[openai,google]>=1.107,<2",
+    "google-genai>=1.75",
+    # Persistência analítica e vetores (DuckDB + Qdrant).
+    "duckdb>=1.5",
+    "qdrant-client>=1.18",
+    # document_processing: PDF (PyMuPDF/fitz), OCR e layout (PaddleOCR + PaddlePaddle).
+    "PyMuPDF>=1.28",
+    "paddleocr>=3.7",
+    "paddlepaddle>=3.3",
+    # UI do analista (Streamlit); pyarrow é exigido por st.dataframe.
+    "streamlit>=1.65",
+    "pyarrow>=25,<26,!=25.0.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8",
+    "ruff>=0.16",
+    "mypy>=2.3",
 ]
 
 [tool.setuptools.packages.find]

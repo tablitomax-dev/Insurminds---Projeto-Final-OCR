@@ -15,9 +15,12 @@ def render_comparison(
     policy_id_b: str,
     fields: list[dict[str, str]],
     field_labels: dict[str, str],
+    labels: dict[str, str] | None = None,
 ) -> str | None:
     """Compara A × B e explica diferenças; devolve o `comparison_id` da sessão."""
-    st.header("4. Comparação determinística")
+    st.header("3. Comparação")
+    label_a = (labels or {}).get(policy_id_a, policy_id_a)
+    label_b = (labels or {}).get(policy_id_b, policy_id_b)
     if st.button("Comparar A × B"):
         try:
             comparison = policy_api.compare_policies(policy_id_a, policy_id_b)
@@ -25,7 +28,7 @@ def render_comparison(
             st.error(sanitize_error_message("COMPARACAO", error))
         else:
             st.session_state["comparison_id"] = comparison.comparison_id
-            st.caption(f"ComparisonId: {comparison.comparison_id}")
+            st.caption(f"ID da comparação: {comparison.comparison_id}")
             units = {field["code"]: field.get("unit") for field in fields}
             st.table(
                 [
@@ -33,10 +36,14 @@ def render_comparison(
                         "campo": campo.field_code,
                         "resultado": campo.resultado,
                         "direção": campo.direcao,
-                        "valor A": format_value(campo.valor_a, units.get(campo.field_code)),
-                        "valor B": format_value(campo.valor_b, units.get(campo.field_code)),
-                        "evidências A": ", ".join(campo.evidencias_a),
-                        "evidências B": ", ".join(campo.evidencias_b),
+                        f"valor {label_a}": format_value(
+                            campo.valor_a, units.get(campo.field_code)
+                        ),
+                        f"valor {label_b}": format_value(
+                            campo.valor_b, units.get(campo.field_code)
+                        ),
+                        f"evidências {label_a}": ", ".join(campo.evidencias_a),
+                        f"evidências {label_b}": ", ".join(campo.evidencias_b),
                     }
                     for campo in comparison.campos
                 ]

@@ -1,8 +1,7 @@
-"""T-2a (UI): `st.error` nunca carrega texto de apólice nem exceção crua.
+"""Diagnóstico: a UI mostra a mensagem completa do erro (sem trava, 2026-10-05).
 
-A mensagem é tipada (estágio + tipo + IDs) e só ecoa exceções do projeto,
-cuja mensagem já é construída/sanitizada no módulo: `ClassifiedError` ecoa
-apenas o código estável (nunca `str(exc)`).
+Decisão do humano: o projeto não tem dados sensíveis — o "detalhe omitido" foi
+removido e `str(error)` aparece na tela para agilizar o diagnóstico.
 """
 
 from pydantic import BaseModel, ValidationError
@@ -11,7 +10,7 @@ from modules.policy_analysis.public_api import ClassifiedError
 from shared_kernel.errors import ContractValidationError
 from ui.errors import sanitize_error_message
 
-POLICY_TEXT = "Limite agregado R$ 1.000.000"
+DETAIL = "Limite agregado R$ 1.000.000"
 
 
 class _Payload(BaseModel):
@@ -20,43 +19,40 @@ class _Payload(BaseModel):
 
 def _validation_error() -> ValidationError:
     try:
-        _Payload.model_validate({"amount": POLICY_TEXT})
+        _Payload.model_validate({"amount": DETAIL})
     except ValidationError as exc:
         return exc
     raise AssertionError("esperava ValidationError")
 
 
-def test_erro_generico_mostra_tipo_e_estagio_sem_texto():
-    error = RuntimeError(POLICY_TEXT)
-
-    message = sanitize_error_message("PROCESSAMENTO/doc_a", error)
+def test_erro_generico_mostra_o_detalhe_completo():
+    message = sanitize_error_message("PROCESSAMENTO/doc_a", RuntimeError(DETAIL))
 
     assert "PROCESSAMENTO/doc_a" in message
-    assert "RuntimeError" in message
-    assert POLICY_TEXT not in message
+    assert "Erro de execução" in message
+    assert DETAIL in message
 
 
-def test_validation_error_nunca_ecoa_o_input():
+def test_validation_error_mostra_o_detalhe():
     message = sanitize_error_message("EXTRACT", _validation_error())
 
     assert "EXTRACT" in message
-    assert "ValidationError" in message
-    assert POLICY_TEXT not in message
+    assert "Erro de validação" in message
+    assert "amount" in message  # o campo com problema aparece no diagnóstico
 
 
-def test_erro_classificado_ecoa_apenas_o_codigo_sanitizado():
+def test_erro_classificado_mostra_mensagem_e_codigo():
     error = ClassifiedError(
         "LLM_SCHEMA_INVALID",
-        "EXTRACT: citação do LLM fora do texto (quantidade=1)",
+        "saída do LLM fora do schema",
         retriable=True,
     )
 
     message = sanitize_error_message("EXTRACT", error)
 
-    assert "ClassifiedError" in message
+    assert "Erro classificado" in message
     assert "LLM_SCHEMA_INVALID" in message
-    # Só o código é ecoado — nunca `str(exc)` (T-2a).
-    assert "citação do LLM fora do texto" not in message
+    assert "saída do LLM fora do schema" in message
 
 
 def test_erro_de_contrato_e_mantido():
@@ -64,5 +60,5 @@ def test_erro_de_contrato_e_mantido():
 
     message = sanitize_error_message("REVISAO/corrigir", error)
 
-    assert "ContractValidationError" in message
+    assert "Erro de regra de contrato" in message
     assert "field_code desconhecido: xyz" in message
