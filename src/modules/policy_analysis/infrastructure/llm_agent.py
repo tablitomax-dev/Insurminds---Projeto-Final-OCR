@@ -15,6 +15,7 @@ import hashlib
 import json
 import logging
 import os
+import threading
 import time
 from typing import Any, Protocol
 
@@ -75,15 +76,21 @@ def _with_retries(fn, attempts: int, backoff: float):
     for attempt in range(1, max(attempts, 1) + 1):
         try:
             return fn()
-        except Exception as exc:  # falha externa do provedor (timeout/429/5xx)
+        except Exception as exc:  # falha externa do provedor (HTTP/tempo)
             last_exc = exc
+            if getattr(exc, "retriable", True) is False:
+                raise  # fail-fast: erro não-reexecutável não queima tentativas
             if attempt < attempts and backoff > 0:
                 time.sleep(backoff * (2 ** (attempt - 1)))
-    # T-2a: só o tipo da exceção — a mensagem do provedor pode ecoar texto de
-    # apólice e nunca deve vazar em métrica, log ou erro.
+    # Causa raiz preservada (decisão 2026-10-06) com T-2a: só erro HTTP leva a
+    # mensagem do provedor; texto livre vira apenas o nome do tipo.
+    if isinstance(last_exc, ClassifiedError):
+        detalhe = str(last_exc)
+    else:
+        detalhe = _erro_detail(last_exc if last_exc is not None else RuntimeError("sem detalhe"))
     raise ClassifiedError(
         "LLM_UNAVAILABLE",
-        f"provedor de LLM indisponível após {attempts} tentativas ({type(last_exc).__name__})",
+        f"provedor de LLM indisponível após {attempts} tentativas ({detalhe})",
         retriable=True,
     )
 
@@ -626,6 +633,258 @@ class PydanticAIClient:
             pass
         self.usage.append({"model": self._model_name, "tokens": tokens, "prompt_chars": len(prompt)})
         return output
+
+
+#: Exceções de HTTP conhecidas dos SDKs, detectadas por nome — sem import
+#: obrigatório do SDK (o cliente também roda fora do ambiente com pydantic-ai).
+_HTTP_ERROR_NAMES = frozenset(
+    {"ModelHTTPError", "APIStatusError", "APIConnectionError", "APITimeoutError"}
+)
+_HTTP_ERROR_MODULES = frozenset({"httpx", "openai", "urllib3", "requests"})
+
+
+def _is_transient_error(exc: BaseException) -> bool:
+    """Falha de HTTP/tempo do provedor (retry/fallback fazem sentido — EC-01)."""
+    if isinstance(exc, (TimeoutError, ConnectionError, OSError)):
+        return True
+    if type(exc).__name__ in _HTTP_ERROR_NAMES:
+        return True
+    return type(exc).__module__.split(".")[0] in _HTTP_ERROR_MODULES
+
+
+def _http_status(exc: BaseException) -> int | None:
+    """Status HTTP do erro do SDK (pydantic-ai/httpx/openai), se houver."""
+    for attr in ("status_code", "status"):
+        value = getattr(exc, attr, None)
+        if isinstance(value, int):
+            return value
+    response = getattr(exc, "response", None)
+    value = getattr(response, "status_code", None)
+    return value if isinstance(value, int) else None
+
+
+def _api_message(exc: BaseException) -> str:
+    """Trecho curto da mensagem da API para a causa raiz (máx. 200 chars).
+
+    Diagnóstico (decisão 2026-10-06): o analista precisa ver a causa real
+    (ex.: `HTTP 403 — Key limit exceeded`); o trecho é truncado e nunca
+    contém a chave de API (T-2a).
+    """
+    return str(exc).strip().replace("\n", " ")[:200]
+
+
+def _erro_detail(exc: BaseException) -> str:
+    """Causa raiz SEGURA do erro (T-2a): status + mensagem só em erro HTTP.
+
+    O erro HTTP traz o diagnóstico estruturado do provedor (ex.: `HTTP 403 —
+    Key limit exceeded`); exceção de texto livre pode ecoar apólice e vira
+    apenas o nome do tipo (T-2a, coberto por teste).
+    """
+    status = _http_status(exc)
+    if status is None:
+        return type(exc).__name__
+    return f"HTTP {status} — {_api_message(exc)}"
+
+
+def _as_unavailable(exc: Exception) -> Exception:
+    """Classifica a falha do provedor preservando a causa raiz na mensagem.
+
+    401/403 são problema de CONTA (chave/crédito) e viram `LLM_AUTH_FAILED`/
+    `LLM_QUOTA_EXCEEDED` com `retriable=False` (fail-fast: retry e cadeia de
+    fallback não resolvem — todos os níveis compartilham a mesma conta).
+    Demais erros de HTTP/tempo são transitórios e viram
+    `ClassifiedError("LLM_UNAVAILABLE", retriable=True)`. `ClassifiedError` já
+    classificado mantém o próprio código; exceções não transitórias seguem
+    originais.
+    """
+    if isinstance(exc, ClassifiedError):
+        return exc
+    status = _http_status(exc)
+    detalhe = _erro_detail(exc)
+    if status in (401, 403):
+        codigo = "LLM_AUTH_FAILED" if status == 401 else "LLM_QUOTA_EXCEEDED"
+        return ClassifiedError(
+            codigo, f"provedor de LLM recusou a chamada ({detalhe})", retriable=False
+        )
+    if _is_transient_error(exc):
+        return ClassifiedError(
+            "LLM_UNAVAILABLE", f"provedor de LLM indisponível ({detalhe})", retriable=True
+        )
+    return exc
+
+
+#: Rótulos de diagnóstico por posição na cadeia de provedores.
+_PROVIDER_LABELS = ("primary", "fallback", "last_resort")
+
+
+def _provider_label(index: int) -> str:
+    """Rótulo de diagnóstico da posição na cadeia: primary/fallback/last_resort.
+
+    Posições além da terceira seguem o padrão `tier_N` (cadeia de N clientes).
+    """
+    if index < len(_PROVIDER_LABELS):
+        return _PROVIDER_LABELS[index]
+    return f"tier_{index}"
+
+
+class FallbackLLMClient:
+    """Cliente LLM com cadeia de failover: primário → fallback → último recurso (EC-01).
+
+    Motivação (validação real 2026-10-06): um modelo cai 3× seguidas e o
+    `_with_retries` dos agentes rebatia sempre no MESMO modelo. Generalizado para
+    uma cadeia de N clientes (`*clients`, em ordem de preferência): cada provedor
+    tem seu próprio contador de FALHAS CONSECUTIVAS e, após `failover_after`
+    falhas seguidas do nível atual (padrão 2), o MESMO prompt é atendido pelo
+    próximo nível dentro da mesma chamada — o avanço cascateia (o 2º também pode
+    cair para o 3º). Falha transitória abaixo do limiar vira
+    `ClassifiedError("LLM_UNAVAILABLE", retriable=True)` para que o
+    `_with_retries` dos agentes re-chame e acumule as falhas até o limiar: com
+    `failover_after=2` e `_with_retries(attempts=3)`, 2 falhas do primário são
+    atendidas pelo fallback ainda dentro da mesma chamada de agente. Último
+    nível esgotado também devolve `ClassifiedError("LLM_UNAVAILABLE",
+    retriable=True)`.
+
+    Sem recuperação automática dos níveis anteriores: uma vez avançado, as
+    chamadas seguintes vão direto ao provedor ativo até `reset_failover()` (volta
+    ao início e zera os contadores). Sucesso de um provedor zera o contador dele
+    (recuperação parcial). Diagnóstico: `active_provider` devolve o rótulo da
+    posição ativa — "primary" (1º), "fallback" (2º), "last_resort" (3º) e
+    "tier_N" da 4ª posição em diante —, `active_model` o modelo do provedor
+    ativo, `failures_by_provider` os contadores por posição e
+    `consecutive_failures` o contador do ativo. Thread-safe (`threading.Lock`) —
+    os clientes são chamados em paralelo por um ThreadPoolExecutor.
+    """
+
+    def __init__(self, *clients: LLMClient, failover_after: int = 2):
+        if not clients:
+            raise ValueError("a cadeia de LLM precisa de ao menos um cliente")
+        self._clients: tuple[LLMClient, ...] = clients
+        self._failover_after = failover_after
+        self._lock = threading.Lock()
+        self._failures = [0] * len(self._clients)
+        self._active_index = 0
+        self._model_name = getattr(clients[0], "_model_name", "llm")
+        self.usage: list[dict] = []
+
+    @property
+    def active_provider(self) -> str:
+        """Rótulo do provedor ativo: "primary", "fallback", "last_resort" ou "tier_N"."""
+        with self._lock:
+            return _provider_label(self._active_index)
+
+    @property
+    def active_model(self) -> str:
+        """Modelo do provedor que tem atendido as chamadas (diagnóstico)."""
+        with self._lock:
+            client = self._clients[self._active_index]
+        return getattr(client, "_model_name", self.active_provider)
+
+    @property
+    def consecutive_failures(self) -> int:
+        """Falhas consecutivas do provedor ativo (diagnóstico)."""
+        with self._lock:
+            return self._failures[self._active_index]
+
+    @property
+    def failures_by_provider(self) -> tuple[int, ...]:
+        """Falhas consecutivas por posição da cadeia (diagnóstico/thread-safety)."""
+        with self._lock:
+            return tuple(self._failures)
+
+    def reset_failover(self) -> None:
+        """Zera os contadores e devolve o primeiro provedor à frente (recuperação manual)."""
+        with self._lock:
+            self._failures = [0] * len(self._clients)
+            self._active_index = 0
+
+    def health_check(self) -> list[dict]:
+        """Diagnóstico da cadeia: uma chamada barata por nível (boot da UI).
+
+        Nunca levanta exceção e NÃO mexe nos contadores de failover (chama o
+        client de cada nível diretamente). Cada item: `{"provider", "model",
+        "ok", "detail"}` — `detail` traz a causa raiz quando falha (ex.:
+        `HTTP 403 — Key limit exceeded (total limit)`).
+        """
+        relatorio: list[dict] = []
+        for index, client in enumerate(self._clients):
+            item: dict[str, Any] = {
+                "provider": _provider_label(index),
+                "model": getattr(client, "_model_name", _provider_label(index)),
+                "ok": False,
+                "detail": None,
+            }
+            try:
+                client.complete_json('Responda somente com JSON no formato {"ok": true}.')
+                item["ok"] = True
+            except Exception as exc:  # noqa: BLE001 — diagnóstico nunca propaga
+                erro = _as_unavailable(exc)
+                item["detail"] = str(erro) if erro is not exc else _erro_detail(exc)
+            relatorio.append(item)
+        return relatorio
+
+    def complete_json(self, prompt: str) -> Any:
+        """Atende o prompt pelo provedor ativo; falha consecutiva avança a cadeia.
+
+        Falha transitória abaixo do limiar vira `ClassifiedError("LLM_UNAVAILABLE",
+        retriable=True)` — o retry externo dos agentes re-chama e acumula falhas
+        até o limiar. Atingido o limiar com próximo na cadeia, o MESMO prompt é
+        tentado no próximo provedor ainda dentro desta chamada (pode cascatear).
+        """
+        while True:
+            with self._lock:
+                index = self._active_index
+            client = self._clients[index]
+            try:
+                result = client.complete_json(prompt)
+            except Exception as exc:  # falha externa do provedor (HTTP/tempo)
+                erro = _as_unavailable(exc)
+                codigo = str(getattr(erro, "code", ""))
+                if codigo in ("LLM_AUTH_FAILED", "LLM_QUOTA_EXCEEDED"):
+                    # 401/403 é problema da CONTA (chave/crédito): todos os
+                    # níveis da cadeia morrem juntos — fail-fast, sem retry e
+                    # sem avanço (`_with_retries` respeita retriable=False).
+                    raise erro from exc
+                status = _http_status(exc)
+                with self._lock:
+                    if status not in (400, 404):
+                        self._failures[index] += 1
+                    # 400/404 = modelo inválido NESTE nível: pula direto para o
+                    # próximo, sem consumir o `failover_after` do nível defeituoso.
+                    avancou = (
+                        status in (400, 404) or self._failures[index] >= self._failover_after
+                    ) and index + 1 < len(self._clients)
+                    if avancou:
+                        self._active_index = index + 1
+                if avancou:
+                    continue  # MESMO prompt, próximo provedor da cadeia
+                if erro is exc:
+                    raise
+                raise erro from exc
+            with self._lock:
+                self._failures[index] = 0
+            self._record(_provider_label(index), client, prompt)
+            return result
+
+    def _record(self, provider: str, client: LLMClient, prompt: str) -> None:
+        """`usage` por chamada com o provedor/modelo que atendeu (RNF-03; T-2a).
+
+        Mesmo formato do `PydanticAIClient` (tokens/prompt_chars) mais o campo
+        `provider`; `_record_usage` lê `usage[-1]["tokens"]` e `_model_name`, que
+        passam a refletir quem realmente respondeu (custo pelo modelo certo).
+        """
+        entry: dict[str, Any] = {
+            "provider": provider,
+            "model": getattr(client, "_model_name", provider),
+            "prompt_chars": len(prompt),
+        }
+        registros = getattr(client, "usage", None) or []
+        if registros:
+            entry["tokens"] = registros[-1].get("tokens")
+        self.usage.append(entry)
+        self._model_name = entry["model"]
+        logging.getLogger("policy_analysis.llm").info(
+            json.dumps({"provider": provider, "model": entry["model"]}, sort_keys=True)
+        )
 
 
 def build_extraction_prompt(requests: list[ExtractionRequest]) -> str:
