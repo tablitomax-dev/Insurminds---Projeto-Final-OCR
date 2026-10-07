@@ -52,6 +52,7 @@ class PolicyAnalysisFacade:
         review_agent=None,
         extra_findings_agent=None,
         report_agent=None,
+        llm_client=None,
     ):
         self._repo = PolicyAnalysisRepository(db_path)
         self._evidence_source = evidence_source
@@ -69,8 +70,26 @@ class PolicyAnalysisFacade:
         self._review_agent = review_agent
         self._extra_findings_agent = extra_findings_agent
         self._report_agent = report_agent
+        self._llm_client = llm_client
         self._markdown_source = None  # cache de seções em memória (repo é o durável)
         self._file_paths: dict[str, str] = {}  # policy_id → caminho do PDF
+
+    # --- saúde do provedor de IA (banner da UI; F-15) -------------------------
+
+    def llm_health(self) -> list[dict]:
+        """Diagnóstico da cadeia de LLM: um item por nível, nunca levanta erro.
+
+        Cada item: `{"provider", "model", "ok", "detail"}` — `detail` traz a
+        causa raiz quando o nível falha (ex.: `HTTP 403 — Key limit exceeded`).
+        `[]` quando não há client compatível com `health_check`.
+        """
+        check = getattr(self._llm_client, "health_check", None)
+        if not callable(check):
+            return []
+        try:
+            return list(check())
+        except Exception:  # noqa: BLE001 — diagnóstico nunca derruba a UI
+            return []
 
     # --- extração (RF-02, RF-03) ----------------------------------------------
 
