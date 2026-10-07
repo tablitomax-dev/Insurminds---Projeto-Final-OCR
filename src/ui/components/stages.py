@@ -9,8 +9,13 @@ import streamlit as st
 from modules.document_processing.public_api import DocumentProcessingFacade
 from modules.policy_analysis.public_api import PolicyAnalysisFacade
 from ui.errors import sanitize_error_message
-from ui.logic import build_display_labels, stage_label, status_label
+from ui.logic import build_display_labels, stage_label
 from ui.uploads import cleanup_uploads, save_upload
+
+#: Aviso de conclusão da extração — o usuário segue direto para a consulta.
+EXTRACTION_DONE_NOTICE = (
+    "Extração concluída — você já pode fazer suas perguntas na seção de consulta livre."
+)
 
 
 def current_labels(policy_ids: tuple[str, str]) -> dict[str, str]:
@@ -116,89 +121,41 @@ def render_extraction(
     policy_api: PolicyAnalysisFacade,
     policy_ids: tuple[str, str],
     fields: list[dict[str, str]],
-    field_labels: dict[str, str],
     labels: dict[str, str],
 ) -> None:
-    """Estágio de extração: TODOS os campos das duas apólices em um passo.
+    """Extração automática dos campos quando o processamento termina.
 
-    A extração completa persiste os fatos — é o que deixa a comparação
-    determinística pronta (ela consome os fatos das duas apólices).
+    Roda UMA única vez por conjunto de apólices (idempotente via
+    `st.session_state` — não repete a cada rerun do Streamlit; a extração usa
+    LLM e pode demorar). A tabela de campos extraídos não é mais exibida: os
+    fatos ficam nos bastidores (a comparação e a revisão consomem os fatos
+    persistidos) e o usuário só vê o aviso de conclusão antes de ir para a
+    consulta livre.
     """
-    codes = [field["code"] for field in fields]
-    if st.button("Extrair todos os campos das duas apólices"):
-        facts_by_policy: dict[str, list] = {}
-        for policy_id in policy_ids:
-            try:
-                facts_by_policy[policy_id] = policy_api.extract_fields(policy_id, codes)
-            except Exception as error:  # noqa: BLE001 — mensagem sanitizada na UI
-                st.error(sanitize_error_message(f"EXTRACAO/{labels.get(policy_id, policy_id)}", error))
-                facts_by_policy[policy_id] = []
-        # Botão do Streamlit é efêmero: o resultado fica na sessão para
-        # continuar visível enquanto o usuário usa a comparação/revisão.
-        st.session_state["extracted_facts"] = (tuple(policy_ids), facts_by_policy)
+    if not all(policy_ids) or st.session_state.get("process_done") != tuple(policy_ids):
+        return
 
     cached = st.session_state.get("extracted_facts")
     if not cached or cached[0] != tuple(policy_ids):
-        return
-    facts_by_policy = cached[1]
-
-    st.success("Campos extraídos — prontos para a comparação.")
-    st.dataframe(
-        [
-            {
-                "campo": field_labels.get(code, code),
-                **{
-                    labels.get(policy_id, policy_id): next(
-                        (
-                            status_label(fact.status)
-                            for fact in facts_by_policy.get(policy_id, [])
-                            if fact.field_code == code
-                        ),
-                        "—",
+        codes = [field["code"] for field in fields]
+        facts_by_policy: dict[str, list] = {}
+        errors: list[str] = []
+        with st.spinner("Extraindo os campos das apólices…"):
+            for policy_id in policy_ids:
+                try:
+                    facts_by_policy[policy_id] = policy_api.extract_fields(policy_id, codes)
+                except Exception as error:  # noqa: BLE001 — mensagem sanitizada na UI
+                    errors.append(
+                        sanitize_error_message(f"EXTRACAO/{labels.get(policy_id, policy_id)}", error)
                     )
-                    for policy_id in policy_ids
-                },
-            }
-            for code in codes
-        ],
-        hide_index=True,
-    )
-    for policy_id in policy_ids:
-        for fact in facts_by_policy.get(policy_id, []):
-            label = field_labels.get(fact.field_code, fact.field_code)
-            with st.expander(
-                f"{labels.get(policy_id, policy_id)} · {label} · {status_label(fact.status)}"
-            ):
-                st.json(fact.model_dump())
-                for evidence_id in fact.evidence_ids:
-                    st.caption(f"evidência: {evidence_id}")
+                    facts_by_policy[policy_id] = []
+        # Idempotência: o resultado fica na sessão e o rerun não refaz a extração.
+        cached = (tuple(policy_ids), facts_by_policy, errors)
+        st.session_state["extracted_facts"] = cached
 
-    # Campos adicionais que a LLM julgou relevantes fora do catálogo fechado
-    # (decisão híbrido): exibidos À PARTE, nunca entram na comparação.
-    extras_by_policy: dict[str, list] = {}
-    for policy_id in policy_ids:
-        try:
-            extras_by_policy[policy_id] = policy_api.extract_extra_findings(policy_id)
-        except Exception as error:  # noqa: BLE001 — mensagem sanitizada na UI
-            st.warning(sanitize_error_message(f"EXTRAS/{labels.get(policy_id, policy_id)}", error))
-            extras_by_policy[policy_id] = []
-    if any(extras_by_policy.values()):
-        st.subheader("Campos adicionais identificados pela LLM")
-        st.caption(
-            "Achados relevantes fora do catálogo fixo — referência à parte, "
-            "fora da comparação determinística."
-        )
-        st.dataframe(
-            [
-                {
-                    "apólice": labels.get(policy_id, policy_id),
-                    "campo": finding.get("label", ""),
-                    "valor": finding.get("value", ""),
-                    "detalhe": finding.get("detail", ""),
-                    "evidências": ", ".join(finding.get("evidence_ids") or []),
-                }
-                for policy_id in policy_ids
-                for finding in extras_by_policy.get(policy_id, [])
-            ],
-            hide_index=True,
-        )
+    errors = cached[2]
+    if errors:
+        for message in errors:
+            st.error(message)
+    else:
+        st.success(EXTRACTION_DONE_NOTICE)

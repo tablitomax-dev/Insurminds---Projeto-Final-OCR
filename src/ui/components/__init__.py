@@ -7,6 +7,7 @@ na UI (F-15).
 
 from ui.components.comparison import render_comparison
 from ui.components.export import render_export
+from ui.components.health import render_llm_health_banner
 from ui.components.metrics import format_usage_summary, render_metrics_panel
 from ui.components.query import render_query
 from ui.components.report import render_report
@@ -21,6 +22,7 @@ __all__ = [
     "render_comparison",
     "render_export",
     "render_extraction",
+    "render_llm_health_banner",
     "render_metrics_panel",
     "render_processing",
     "render_query",
