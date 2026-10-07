@@ -3,7 +3,10 @@
 Prompts versionados (`*_PROMPT_VERSION` + `prompt_fingerprint` para diff
 auditável), execução com retry/backoff (`_with_retries`), registro de uso com
 kind novo `"report"` (`_record_usage`) e provedor real `PydanticAIClient` via
-`complete_json`. `FixtureReportAgent` roda sem rede (testes e demo offline).
+`complete_json`. O contrato `fill_batch` (lote de categorias por chamada) está
+preparado, com implementação estacionada — hoje o preenchimento usa
+`fill_category` (map/reduce original). `FixtureReportAgent` roda sem rede
+(testes e demo offline) e conta chamadas (`calls`).
 
 Regras obrigatórias em todos os prompts: exigir referência documental
 (arquivo/página/seção) em toda célula; usar SOMENTE o vocabulário de status;
@@ -38,6 +41,7 @@ from .llm_agent import (
 # correspondente (diff auditável + re-execução do golden set).
 IDENTIFY_PROMPT_VERSION = "report-identify-v1"
 FILL_PROMPT_VERSION = "report-fill-v1"
+FILL_BATCH_PROMPT_VERSION = "report-fill-batch-v1"
 TABLES_PROMPT_VERSION = "report-tables-v1"
 SCENARIOS_PROMPT_VERSION = "report-scenarios-v1"
 SCORES_PROMPT_VERSION = "report-scores-v1"
@@ -64,6 +68,13 @@ class ReportAgent(Protocol):
 
     def fill_category(
         self, category: ReportCategory, fields: tuple[ReportField, ...], sections: list[dict]
+    ) -> dict: ...
+
+    def fill_batch(
+        self,
+        categories: tuple[ReportCategory, ...],
+        fields: tuple[ReportField, ...],
+        sections: list[dict],
     ) -> dict: ...
 
     def fill_tables(self, policy_ids: list[str], sections_by_policy: dict) -> list: ...

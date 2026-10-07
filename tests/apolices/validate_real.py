@@ -9,7 +9,7 @@ Rodadas (cada arquivo ao menos uma vez):
     3: Allianz 2017 (JPG, convertido para PDF) + PORTO
 
 Pipeline real: PyMuPDF + PaddleOCR (pesado, markdown via PP-StructureV3) →
-cache DuckDB → RAG por seções → extração LLM (MiMo) → comparação →
+cache DuckDB → RAG por seções → extração LLM (cadeia glm → deepseek → mimo) → comparação →
 Relatório D&O → export. Não é código de produto: é a bancada de validação.
 """
 
@@ -26,7 +26,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "tests"))
 
-os.environ.setdefault("LLM_MODEL", "xiaomi/mimo-v2.6-pro")
+os.environ.setdefault("LLM_MODEL", "z-ai/glm-5.3-flash")
 # Cache dos modelos Paddle dentro do workspace (decisão E-09) — sem isto o
 # Paddle tenta rebaixar tudo para o perfil do usuário e trava.
 os.environ.setdefault("PADDLE_PDX_CACHE_HOME", str(ROOT / ".tools" / "paddlex-home"))
@@ -36,6 +36,7 @@ from modules.policy_analysis.infrastructure.document_processing_source import ( 
     DocumentProcessingEvidenceSource,
 )
 from modules.policy_analysis.infrastructure.llm_agent import (  # noqa: E402
+    FallbackLLMClient,
     InsurerNameAgent,
     LLMExplanationAgent,
     LLMExtraFindingsAgent,
@@ -79,7 +80,7 @@ def to_pdf(path: Path) -> Path:
 
 
 def build_facades():
-    """Fachadas reais: OCR pesado (PP-StructureV3 markdown) + LLM MiMo."""
+    """Fachadas reais: OCR pesado (PP-StructureV3 markdown) + cadeia de LLMs."""
     from fakes.document_processing import FakeEmbedder, InMemoryVectorIndex, RecordingStatusSink
     from modules.document_processing.infrastructure.extractors import (
         PaddleOcrEngine,
@@ -101,7 +102,25 @@ def build_facades():
         status_sink=RecordingStatusSink(),
         layout_engine=layout,
     )
-    client = PydanticAIClient()
+    # Cadeia de failover (EC-01): glm → deepseek → mimo; após 2 falhas seguidas
+    # de um nível, o próximo atende o MESMO prompt (`LLM_MODEL`,
+    # `LLM_FALLBACK_MODEL` e `LLM_FALLBACK_MODEL_2`; chave via
+    # `OPENROUTER_API_KEY`). Com `GEMINI_API_KEY`, nível extra em CONTA
+    # separada no fim da cadeia (`LLM_GEMINI_MODEL`, padrão `gemini-2.0-flash`).
+    tiers = [
+        PydanticAIClient(model_name=os.environ.get("LLM_MODEL", "z-ai/glm-5.3-flash")),
+        PydanticAIClient(
+            model_name=os.environ.get("LLM_FALLBACK_MODEL", "deepseek/deepseek-v4.1-flash")
+        ),
+        PydanticAIClient(
+            model_name=os.environ.get("LLM_FALLBACK_MODEL_2", "xiaomi/mimo-v2.6-pro")
+        ),
+    ]
+    if os.environ.get("GEMINI_API_KEY"):
+        tiers.append(
+            PydanticAIClient(model_name=os.environ.get("LLM_GEMINI_MODEL", "gemini-2.0-flash"))
+        )
+    client = FallbackLLMClient(*tiers)
     policy = PolicyAnalysisFacade(
         DocumentProcessingEvidenceSource(top_k=20, facade=document),
         MultiFieldExtractionAgent(client),
@@ -113,6 +132,7 @@ def build_facades():
         review_agent=LLMReviewAgent(client),
         extra_findings_agent=LLMExtraFindingsAgent(client),
         report_agent=LLMReportAgent(client),
+        llm_client=client,
     )
     return document, policy
 

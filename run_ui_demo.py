@@ -115,6 +115,7 @@ def build_demo_facades(
         # Pipeline real sobre os PDFs enviados: OCR/texto indexados de verdade
         # + modelo real para extração/explicação/perguntas/revisão.
         from modules.policy_analysis.infrastructure.llm_agent import (
+            FallbackLLMClient,
             InsurerNameAgent,
             LLMExplanationAgent,
             LLMExtraFindingsAgent,
@@ -125,7 +126,31 @@ def build_demo_facades(
         )
         from modules.policy_analysis.infrastructure.report_agent import LLMReportAgent
 
-        client = PydanticAIClient(model_name=model_name if model_name != "fixture" else None)
+        # Cadeia de failover (EC-01): glm → deepseek → mimo; após 2 falhas
+        # consecutivas de um nível, o próximo atende o MESMO prompt (chave via
+        # `OPENROUTER_API_KEY`/`GEMINI_API_KEY`; modelos sobrescrevíveis por env
+        # `LLM_MODEL`, `LLM_FALLBACK_MODEL` e `LLM_FALLBACK_MODEL_2`).
+        # Com `GEMINI_API_KEY` definida, um nível EXTRA em CONTA separada entra
+        # no fim da cadeia — é o único que sobrevive a limite estourado no
+        # OpenRouter (modelo via `LLM_GEMINI_MODEL`, padrão `gemini-2.0-flash`).
+        tiers = [
+            PydanticAIClient(
+                model_name=model_name
+                if model_name != "fixture"
+                else os.environ.get("LLM_MODEL", "z-ai/glm-5.3-flash")
+            ),
+            PydanticAIClient(
+                model_name=os.environ.get("LLM_FALLBACK_MODEL", "deepseek/deepseek-v4.1-flash")
+            ),
+            PydanticAIClient(
+                model_name=os.environ.get("LLM_FALLBACK_MODEL_2", "xiaomi/mimo-v2.6-pro")
+            ),
+        ]
+        if os.environ.get("GEMINI_API_KEY"):
+            tiers.append(
+                PydanticAIClient(model_name=os.environ.get("LLM_GEMINI_MODEL", "gemini-2.0-flash"))
+            )
+        client = FallbackLLMClient(*tiers)
         policy = PolicyAnalysisFacade(
             # top_k=20 é o teto do contrato `RetrievalQuery`; a cobertura do
             # documento vem do merge de consultas do adaptador de evidências.
@@ -139,6 +164,7 @@ def build_demo_facades(
             review_agent=LLMReviewAgent(client),
             extra_findings_agent=LLMExtraFindingsAgent(client),
             report_agent=LLMReportAgent(client),
+            llm_client=client,
         )
         return document, policy
 
